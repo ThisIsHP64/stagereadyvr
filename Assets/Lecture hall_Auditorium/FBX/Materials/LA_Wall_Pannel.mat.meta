@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b799c066a2aeee94386f6c29bd85358a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/LA_Wall_Pannel.mat
+  uploadId: 780558

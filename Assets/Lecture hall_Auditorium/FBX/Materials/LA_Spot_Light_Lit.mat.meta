@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4817361aece9eba4d9ddecb95255816f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/LA_Spot_Light_Lit.mat
+  uploadId: 780558

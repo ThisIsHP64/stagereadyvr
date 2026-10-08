@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: de66359e5e0ba0d429a8da0ca7f60b2d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/Auditorium_Chair.mat
+  uploadId: 780558

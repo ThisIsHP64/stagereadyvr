@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4d6438a276684954b93088bf86037c0b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/Lecture_Whiteboard_Black.mat
+  uploadId: 780558

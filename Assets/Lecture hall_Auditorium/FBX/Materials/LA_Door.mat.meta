@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ae4162078ba1e0b4cabb109b8096a56e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/LA_Door.mat
+  uploadId: 780558

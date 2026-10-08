@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b87f21626a577cd44bdbdc56557f3d35
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Prefab/Auditorium_SoundReflectors.prefab
+  uploadId: 780558

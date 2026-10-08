@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 04419658640f85046a7b2986b937f42f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Prefab/LA_Spot_Light_Beam.prefab
+  uploadId: 780558

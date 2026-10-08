@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6b0b5d292f340a7468f1b7ee85d7b3f5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 329889
+  packageName: Lecture Hall_Auditorium
+  packageVersion: 1.0
+  assetPath: Assets/Lecture hall_Auditorium/FBX/Materials/LA_SupporPipe.mat
+  uploadId: 780558
