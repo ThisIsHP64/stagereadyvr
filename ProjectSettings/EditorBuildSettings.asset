@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/MainMenu.unity
+    guid: b1de67c353dbebc45b5d7484ef6b4c8c
+  - enabled: 1
+    path: Assets/Lecture hall_Auditorium/Auditorium.unity
+    guid: 2f24e717ddedb7442a312783c4bf6c2a
+  - enabled: 1
+    path: Assets/Nimikko_UniversityClassroom/Scenes/UniversityClassroom.unity
+    guid: 00f2b520c594c7446b0f7d80a2392d80
+  - enabled: 1
+    path: Assets/Conference Room 01_V2/Conference Room 01_V2.unity
+    guid: 515571571d03fed41b950a9976c47a1c
+  m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 2fc0029a2c7a43a4495aa1d563194e10,
+      type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: e4405c24029f2c34181dcb71bc0984be,
+      type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: d3458aa8f3b1b3b4d9788dba764c8fd1,
+      type: 2}
