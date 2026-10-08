@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d905d26c497af0e498d6b194e14c0a93
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 216961
+  packageName: npc_casual_set_01
+  packageVersion: 1.3.6
+  assetPath: Assets/npc_casual_set_01/MaterialsUPR/mtl_npc_csl_shirtrolled_01m_01_02.mat
+  uploadId: 807664

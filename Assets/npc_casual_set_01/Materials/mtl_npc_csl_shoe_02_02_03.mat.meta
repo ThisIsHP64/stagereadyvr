@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 91d6116ed684d6e459ae1d2a4b7b2a88
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 216961
+  packageName: npc_casual_set_01
+  packageVersion: 1.3.6
+  assetPath: Assets/npc_casual_set_01/Materials/mtl_npc_csl_shoe_02_02_03.mat
+  uploadId: 807664

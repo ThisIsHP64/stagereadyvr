@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eba9617f7274e42459252580acb0ded7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 216961
+  packageName: npc_casual_set_01
+  packageVersion: 1.3.6
+  assetPath: Assets/npc_casual_set_01/Materials/mtl_npc_csl_raglanrolled_01f_01_01.mat
+  uploadId: 807664

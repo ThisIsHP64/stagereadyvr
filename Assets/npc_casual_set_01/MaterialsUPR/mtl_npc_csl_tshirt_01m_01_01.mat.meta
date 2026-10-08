@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3f967a6f18ea5d245a54fdc787982b55
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 216961
+  packageName: npc_casual_set_01
+  packageVersion: 1.3.6
+  assetPath: Assets/npc_casual_set_01/MaterialsUPR/mtl_npc_csl_tshirt_01m_01_01.mat
+  uploadId: 807664
