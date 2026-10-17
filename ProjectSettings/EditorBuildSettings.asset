@@ -18,6 +18,8 @@ EditorBuildSettings:
     path: Assets/Conference Room 01_V2/Conference Room 01_V2.unity
     guid: 515571571d03fed41b950a9976c47a1c
   m_configObjects:
+    Unity.XR.PXR.Settings: {fileID: 11400000, guid: 9fc2c969266702134b0a497e2287b268,
+      type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: e4405c24029f2c34181dcb71bc0984be,
       type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: d3458aa8f3b1b3b4d9788dba764c8fd1,
