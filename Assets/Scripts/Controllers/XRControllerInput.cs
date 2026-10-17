@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
+using ISButton = UnityEngine.InputSystem.Controls.ButtonControl;
+using ISController = UnityEngine.InputSystem.XR.XRController;
+using ISDevice = UnityEngine.InputSystem.InputDevice;
 
 namespace StageReadyVR.Controllers
 {
@@ -19,10 +23,12 @@ namespace StageReadyVR.Controllers
     }
 
     /// <summary>
-    /// Vendor-neutral controller button polling built on UnityEngine.XR.InputDevices,
-    /// so it works with whichever XR loader is active (PICO, OpenXR, ...). Provides
-    /// per-frame "down" edge detection that is safe to query from several scripts
-    /// in the same frame.
+    /// Vendor-neutral controller button polling with per-frame "down" edge
+    /// detection that is safe to query from several scripts in the same frame.
+    /// Each button is read through two independent routes and counts as pressed
+    /// if either reports it: the legacy UnityEngine.XR feature usages, and the
+    /// Input System controls declared by the active controller layout. Using
+    /// both means a naming difference in one route cannot disable a button.
     /// </summary>
     public static class XRControllerInput
     {
@@ -31,14 +37,24 @@ namespace StageReadyVR.Controllers
         private const InputDeviceCharacteristics RightHand =
             InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Right;
 
-        private static readonly int ButtonCount = System.Enum.GetValues(typeof(ControllerButton)).Length;
+        // retry quickly until every control is found, then only re-check rarely
+        private const int ResolveRetryFrames = 60;
+        private const int ResolveSettledFrames = 600;
+
+        private static readonly int ButtonCount = Enum.GetValues(typeof(ControllerButton)).Length;
         private static readonly bool[] Held = new bool[ButtonCount];
         private static readonly bool[] Down = new bool[ButtonCount];
-        private static readonly List<InputDevice> Scratch = new List<InputDevice>(2);
+        private static readonly List<UnityEngine.XR.InputDevice> Scratch = new List<UnityEngine.XR.InputDevice>(2);
 
-        private static InputDevice _left;
-        private static InputDevice _right;
+        private static UnityEngine.XR.InputDevice _left;
+        private static UnityEngine.XR.InputDevice _right;
         private static int _lastRefreshFrame = -1;
+
+        private static ISButton _isLeftMenu;
+        private static ISButton _isLeftPrimary;
+        private static ISButton _isRightPrimary;
+        private static ISButton _isRightSecondary;
+        private static int _nextResolveFrame;
 
         /// <summary>True only on the first frame the button is pressed.</summary>
         public static bool GetDown(ControllerButton button)
@@ -65,6 +81,8 @@ namespace StageReadyVR.Controllers
             bool contiguous = _lastRefreshFrame == frame - 1;
             _lastRefreshFrame = frame;
 
+            ResolveInputSystemControls(frame);
+
             for (int i = 0; i < ButtonCount; i++)
             {
                 bool now = Sample((ControllerButton)i);
@@ -78,23 +96,29 @@ namespace StageReadyVR.Controllers
             switch (button)
             {
                 case ControllerButton.LeftMenu:
-                    return Read(ref _left, LeftHand, CommonUsages.menuButton);
+                    return ReadLegacy(ref _left, LeftHand, CommonUsages.menuButton)
+                        || IsPressed(_isLeftMenu);
                 case ControllerButton.LeftPrimary:
-                    return Read(ref _left, LeftHand, CommonUsages.primaryButton);
+                    return ReadLegacy(ref _left, LeftHand, CommonUsages.primaryButton)
+                        || IsPressed(_isLeftPrimary);
                 case ControllerButton.RightPrimary:
-                    return Read(ref _right, RightHand, CommonUsages.primaryButton);
+                    return ReadLegacy(ref _right, RightHand, CommonUsages.primaryButton)
+                        || IsPressed(_isRightPrimary);
                 case ControllerButton.RightSecondary:
-                    return Read(ref _right, RightHand, CommonUsages.secondaryButton);
+                    return ReadLegacy(ref _right, RightHand, CommonUsages.secondaryButton)
+                        || IsPressed(_isRightSecondary);
                 case ControllerButton.AnyPrimary:
-                    return Read(ref _left, LeftHand, CommonUsages.primaryButton)
-                        || Read(ref _right, RightHand, CommonUsages.primaryButton);
+                    return ReadLegacy(ref _left, LeftHand, CommonUsages.primaryButton)
+                        || ReadLegacy(ref _right, RightHand, CommonUsages.primaryButton)
+                        || IsPressed(_isLeftPrimary)
+                        || IsPressed(_isRightPrimary);
                 default:
                     return false;
             }
         }
 
-        private static bool Read(ref InputDevice device, InputDeviceCharacteristics hand,
-                                 InputFeatureUsage<bool> usage)
+        private static bool ReadLegacy(ref UnityEngine.XR.InputDevice device, InputDeviceCharacteristics hand,
+                                       InputFeatureUsage<bool> usage)
         {
             // controllers can connect or drop at any time, so re-acquire when invalid
             if (!device.isValid)
@@ -105,6 +129,51 @@ namespace StageReadyVR.Controllers
                 device = Scratch[0];
             }
             return device.TryGetFeatureValue(usage, out bool value) && value;
+        }
+
+        private static bool IsPressed(ISButton control)
+        {
+            return control != null && control.device != null && control.device.added && control.isPressed;
+        }
+
+        // control names come from the controller layout, so try the layout name first
+        // and then its alias; lookups are cached because devices rarely change
+        private static void ResolveInputSystemControls(int frame)
+        {
+            if (frame < _nextResolveFrame) return;
+
+            _isLeftMenu = FindControl("LeftHand", "menu", "menuButton");
+            _isLeftPrimary = FindControl("LeftHand", "primaryButton", "X");
+            _isRightPrimary = FindControl("RightHand", "primaryButton", "A");
+            _isRightSecondary = FindControl("RightHand", "secondaryButton", "B");
+
+            bool allFound = _isLeftMenu != null && _isLeftPrimary != null
+                         && _isRightPrimary != null && _isRightSecondary != null;
+            _nextResolveFrame = frame + (allFound ? ResolveSettledFrames : ResolveRetryFrames);
+        }
+
+        private static ISButton FindControl(string handUsage, string name, string alias)
+        {
+            var devices = UnityEngine.InputSystem.InputSystem.devices;
+            for (int i = 0; i < devices.Count; i++)
+            {
+                ISDevice device = devices[i];
+                if (!(device is ISController) || !HasUsage(device, handUsage)) continue;
+
+                if (device.TryGetChildControl(name) is ISButton byName) return byName;
+                if (device.TryGetChildControl(alias) is ISButton byAlias) return byAlias;
+            }
+            return null;
+        }
+
+        private static bool HasUsage(ISDevice device, string usage)
+        {
+            var usages = device.usages;
+            for (int i = 0; i < usages.Count; i++)
+            {
+                if (string.Equals(usages[i], usage, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
     }
 }
