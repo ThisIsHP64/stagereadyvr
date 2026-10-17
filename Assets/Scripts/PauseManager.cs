@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using StageReadyVR.Controllers;
 
 public class PauseManager : MonoBehaviour
 {
@@ -16,7 +17,7 @@ public class PauseManager : MonoBehaviour
     void Update()
     {
         // Menu button to toggle pause
-        if (OVRInput.GetDown(OVRInput.Button.Start, OVRInput.Controller.LTouch))
+        if (XRControllerInput.GetDown(ControllerButton.LeftMenu))
         {
             if (isPaused) Resume();
             else Pause();
@@ -24,9 +25,9 @@ public class PauseManager : MonoBehaviour
 
         if (isPaused)
         {
-            if (OVRInput.GetDown(OVRInput.Button.One)) Resume();           // A
-            if (OVRInput.GetDown(OVRInput.Button.Two)) Restart();          // B
-            if (OVRInput.GetDown(OVRInput.Button.Three)) ReturnToMainMenu(); // X
+            if (XRControllerInput.GetDown(ControllerButton.RightPrimary)) Resume();           // A
+            if (XRControllerInput.GetDown(ControllerButton.RightSecondary)) Restart();      // B
+            if (XRControllerInput.GetDown(ControllerButton.LeftPrimary)) ReturnToMainMenu(); // X
         }
     }
 

@@ -85,8 +85,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4645824836498982479}
-  - component: {fileID: 6264346492700848764}
-  - component: {fileID: 9069691489223307857}
   - component: {fileID: 10294679455823518}
   m_Layer: 0
   m_Name: ISDK_RayCanvasInteraction
@@ -115,43 +113,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &6264346492700848764
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 96093726872227566}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bb86ba9d4c5126e48bfef9b0c9550e9d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _interactorFilters: []
-  _maxInteractors: -1
-  _maxSelectingInteractors: -1
-  _data: {fileID: 0}
-  _pointableElement: {fileID: 9069691489223307857}
-  _surface: {fileID: 1083690763887869736}
-  _selectSurface: {fileID: 1674237699448169708}
-  _movementProvider: {fileID: 0}
-  _tiebreakerScore: 0
---- !u!114 &9069691489223307857
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 96093726872227566}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3ffe41fe81087fa41a2062cc69b99615, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _transferOnSecondSelection: 0
-  _addNewPointsToFront: 0
-  _forwardElement: {fileID: 0}
-  _canvas: {fileID: 5473333137134477484}
 --- !u!114 &10294679455823518
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2519,10 +2480,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1411211881047170000}
-  - component: {fileID: 1674237699448169708}
-  - component: {fileID: 1083690763887869736}
-  - component: {fileID: 7246693786608008800}
-  - component: {fileID: 7872750783454806687}
   m_Layer: 0
   m_Name: Surface
   m_TagString: Untagged
@@ -2549,62 +2506,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1674237699448169708
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6159601681756726940}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9cf2a74d69b1c1e41916d2a7afdff5be, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _facing: 0
-  _doubleSided: 0
---- !u!114 &1083690763887869736
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6159601681756726940}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: efd927768041afd4d90e5d822283f0f4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _planeSurface: {fileID: 1674237699448169708}
-  _clippers:
-  - {fileID: 7246693786608008800}
---- !u!114 &7246693786608008800
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6159601681756726940}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e08ab46e8fb05dc46b34e54466dc11e3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _position: {x: 0, y: 0, z: 0}
-  _size: {x: 1500, y: 820, z: 0.01}
---- !u!114 &7872750783454806687
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6159601681756726940}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4bd1f1e23a51a7d428dd152466736b7a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _boundsClipper: {fileID: 7246693786608008800}
 --- !u!1 &6407061509084843397
 GameObject:
   m_ObjectHideFlags: 0
@@ -2827,6 +2728,7 @@ GameObject:
   - component: {fileID: 1522048154560705167}
   - component: {fileID: 2147500973612672212}
   - component: {fileID: 52263150476247772}
+  - component: {fileID: 7301008623700957279}
   m_Layer: 0
   m_Name: FeedbackDashboard
   m_TagString: Untagged
@@ -2945,8 +2847,6 @@ MonoBehaviour:
   - {fileID: 9039562236434309592}
   - {fileID: 6683864453161216565}
   - {fileID: 805229647841387326}
-  timelineTrack: {fileID: 8507110131770863627}
-  markerPrefab: {fileID: 8958215588804163796}
   summaryText: {fileID: 5413405097094380528}
   retryButton: {fileID: 7614359531433697828}
   nextButton: {fileID: 3026865242951678244}
@@ -2955,7 +2855,25 @@ MonoBehaviour:
   recommendationsText: {fileID: 1884874386063830999}
   backdrop: {fileID: 0}
   fillDuration: 0.8
-  audienceRoot: {fileID: 0}
+--- !u!114 &7301008623700957279
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6593117388903446097}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7951c64acb0fa62458bf30a60089fe2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_IgnoreReversedGraphics: 0
+  m_CheckFor2DOcclusion: 0
+  m_CheckFor3DOcclusion: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RaycastTriggerInteraction: 1
 --- !u!1 &6969464187992524695
 GameObject:
   m_ObjectHideFlags: 0

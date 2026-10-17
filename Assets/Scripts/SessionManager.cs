@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using TMPro;
 using UnityEngine;
+using StageReadyVR.Controllers;
 using StageReadyVR.Feedback;
 
 /// <summary>
@@ -137,7 +138,7 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         UpdateTimerUI();
 
         // Manual end with A button.
-        if (OVRInput.GetDown(OVRInput.Button.One))
+        if (XRControllerInput.GetDown(ControllerButton.AnyPrimary))
             EndSession();
 
         if (timeRemaining <= 0f)

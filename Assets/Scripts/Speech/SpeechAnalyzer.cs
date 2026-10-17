@@ -1,29 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
-using Oculus.Voice.Dictation;
 using StageReadyVR.Feedback;
 
 /// <summary>
-/// Continuous speech analysis for a practice session using the Meta Voice SDK
-/// (AppDictationExperience / Wit.ai). Accumulates transcription, tracks words
+/// Continuous speech analysis for a practice session. Transcription comes from
+/// a SpeechTranscriber (currently the AssemblyTranscriber stub). Accumulates
+/// transcription, tracks words
 /// per minute over a sliding window, counts filler words and long pauses, and
 /// measures microphone RMS volume. Implements ISpeechMetricsSource so the
 /// feedback module can pull final values at session end.
 ///
 /// Scene setup:
-///   1. Assets > Create > Voice SDK > Add App Dictation Experience to Scene.
-///   2. Assign its Wit configuration (your wit.ai dictation app token).
-///   3. Drag the AppDictationExperience into 'dictation' below.
-///   4. Optionally wire FeedbackController so AddEvent markers appear.
-/// Because Wit dictation auto-deactivates after silence, this component
+///   1. Add a SpeechTranscriber component (AssemblyTranscriber) to the scene.
+///   2. Drag it into 'transcriber' below.
+///   3. Optionally wire FeedbackController so AddEvent markers appear.
+/// Because a transcriber may stop listening after silence, this component
 /// re-activates it whenever it stops while a session is active, giving a
 /// continuous transcription stream across the whole talk.
 /// </summary>
 public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 {
-    [Header("Voice SDK")]
-    [Tooltip("AppDictationExperience component from the Meta Voice SDK")]
-    public AppDictationExperience dictation;
+    [Header("Transcription")]
+    [Tooltip("Speech-to-text source; AssemblyTranscriber is the current stub")]
+    public SpeechTranscriber transcriber;
 
     [Header("Feedback (optional)")]
     [Tooltip("Drops timeline markers for fillers / pauses if assigned")]
@@ -74,13 +73,13 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
     private readonly List<float> volumeSamplesDb = new List<float>();
     private const int MicSampleWindow = 256;
 
-    // [TIMING] Wit.ai transcription-lag measurement.
+    // [TIMING] transcription-lag measurement.
     // _lastStoppedTime marks when the SDK stopped listening (utterance end);
     // OnFull logs the delta to the finalized transcript. Values are collected
-    // in _witLagSamples and summarized at StopAnalysis for the paper's
+    // in _lagSamples and summarized at StopAnalysis for the paper's
     // latency reporting (mean / min / max / n).
     private float _lastStoppedTime = -1f;
-    private readonly List<float> _witLagSamples = new List<float>();
+    private readonly List<float> _lagSamples = new List<float>();
 
     // ── ISpeechMetricsSource implementation ───────────────────────────
 
@@ -102,9 +101,9 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         sessionStartTime = Time.time;
         lastWordTime = Time.time;
 
-        SubscribeDictation();
+        SubscribeTranscriber();
         //StartMicrophone();
-        ActivateDictation();
+        ActivateTranscriber();
 
         Debug.Log("[SpeechAnalyzer] Analysis started.");
     }
@@ -113,49 +112,51 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
     {
         isAnalyzing = false;
 
-        UnsubscribeDictation();
-        if (dictation != null) dictation.Deactivate();
+        UnsubscribeTranscriber();
+        if (transcriber != null) transcriber.Deactivate();
         //StopMicrophone();
         Debug.Log($"[SpeechAnalyzer] Transcript: {GetTranscript()}");
 
         Debug.Log($"[SpeechAnalyzer] Analysis stopped. Words: {totalWords}, " +
                   $"Fillers: {fillerCount}, Avg WPM: {AverageWpm:F0}");
 
-        // [TIMING] Summarize Wit.ai transcription lag for this session.
-        LogWitLagSummary();
+        // [TIMING] Summarize transcription lag for this session.
+        LogLagSummary();
     }
 
-    // ── Dictation wiring ──────────────────────────────────────────────
+    // ── Transcriber wiring ────────────────────────────────────────────
 
-    private void SubscribeDictation()
+    private void SubscribeTranscriber()
     {
-        if (dictation == null)
+        if (transcriber == null)
         {
-            Debug.LogError("[SpeechAnalyzer] No AppDictationExperience assigned.");
+            Debug.LogError("[SpeechAnalyzer] No SpeechTranscriber assigned.");
             return;
         }
-        dictation.DictationEvents.OnPartialTranscription.AddListener(OnPartial);
-        dictation.DictationEvents.OnFullTranscription.AddListener(OnFull);
-        dictation.DictationEvents.OnStoppedListening.AddListener(OnStoppedListening);
+        // unsubscribe first so a repeated StartAnalysis can't double-register
+        UnsubscribeTranscriber();
+        transcriber.OnPartialTranscription += OnPartial;
+        transcriber.OnFullTranscription += OnFull;
+        transcriber.OnStoppedListening += OnStoppedListening;
     }
 
-    private void UnsubscribeDictation()
+    private void UnsubscribeTranscriber()
     {
-        if (dictation == null) return;
-        dictation.DictationEvents.OnPartialTranscription.RemoveListener(OnPartial);
-        dictation.DictationEvents.OnFullTranscription.RemoveListener(OnFull);
-        dictation.DictationEvents.OnStoppedListening.RemoveListener(OnStoppedListening);
+        if (transcriber == null) return;
+        transcriber.OnPartialTranscription -= OnPartial;
+        transcriber.OnFullTranscription -= OnFull;
+        transcriber.OnStoppedListening -= OnStoppedListening;
     }
 
-    private void ActivateDictation()
+    private void ActivateTranscriber()
     {
-        if (dictation != null && isAnalyzing)
-            dictation.Activate();
+        if (transcriber != null && isAnalyzing)
+            transcriber.Activate();
     }
 
-    // Wit dictation drops out after each finalized utterance / silence. To keep
-    // a continuous transcription across a whole speech, restart it — but on a
-    // short delay so the SDK finishes its stop cycle first, and guarded so the
+    // Transcribers can drop out after each finalized utterance / silence. To keep
+    // a continuous transcription across a whole speech, restart it, but on a
+    // short delay so the service finishes its stop cycle first, and guarded so
     // multiple OnStoppedListening callbacks don't queue several restarts.
     private bool _reactivateQueued;
 
@@ -172,11 +173,11 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     private System.Collections.IEnumerator ReactivateAfterDelay()
     {
-        // Small gap lets the SDK fully release before we re-activate.
+        // Small gap lets the service fully release before we re-activate.
         yield return new WaitForSeconds(0.15f);
         _reactivateQueued = false;
         if (isAnalyzing)
-            ActivateDictation();
+            ActivateTranscriber();
     }
 
     private void OnPartial(string text)
@@ -186,7 +187,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     // Full transcription is the finalized chunk for an utterance. We append
     // each chunk rather than trusting a single end-of-session string, which
-    // Wit is known to truncate.
+    // some services truncate.
     private void OnFull(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -200,8 +201,8 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
             float lag = Time.realtimeSinceStartup - _lastStoppedTime;
             if (lag > 0f && lag < 30f)
             {
-                _witLagSamples.Add(lag);
-                Debug.Log($"[Timing] WitFinalTranscript lag={lag:F2}s " +
+                _lagSamples.Add(lag);
+                Debug.Log($"[Timing] TranscriptFinal lag={lag:F2}s " +
                           $"words={TokenizeLower(text).Length}");
             }
             _lastStoppedTime = -1f;
@@ -212,23 +213,23 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         lastPartial = "";
     }
 
-    // [TIMING] Per-session summary line — grep logcat for "[Timing] WitLagSummary".
-    private void LogWitLagSummary()
+    // [TIMING] Per-session summary line, grep logcat for "[Timing] TranscriptLagSummary".
+    private void LogLagSummary()
     {
-        if (_witLagSamples.Count == 0)
+        if (_lagSamples.Count == 0)
         {
-            Debug.Log("[Timing] WitLagSummary n=0");
+            Debug.Log("[Timing] TranscriptLagSummary n=0");
             return;
         }
         float sum = 0f, min = float.MaxValue, max = 0f;
-        foreach (var s in _witLagSamples)
+        foreach (var s in _lagSamples)
         {
             sum += s;
             if (s < min) min = s;
             if (s > max) max = s;
         }
-        Debug.Log($"[Timing] WitLagSummary n={_witLagSamples.Count} " +
-                  $"mean={sum / _witLagSamples.Count:F2}s min={min:F2}s max={max:F2}s");
+        Debug.Log($"[Timing] TranscriptLagSummary n={_lagSamples.Count} " +
+                  $"mean={sum / _lagSamples.Count:F2}s min={min:F2}s max={max:F2}s");
     }
 
     // ── Transcript processing ─────────────────────────────────────────
@@ -430,7 +431,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     void OnDestroy()
     {
-        UnsubscribeDictation();
+        UnsubscribeTranscriber();
         StopMicrophone();
     }
 
@@ -451,7 +452,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         _inPaceSpike = false;
         // [TIMING] reset lag capture per session
         _lastStoppedTime = -1f;
-        _witLagSamples.Clear();
+        _lagSamples.Clear();
     }
 
     public string GetTranscript() => committedTranscript.Trim();

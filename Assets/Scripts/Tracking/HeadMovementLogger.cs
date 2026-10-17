@@ -11,7 +11,7 @@ using StageReadyVR.Feedback;
 public class HeadMovementLogger : MonoBehaviour, IGazeMetricsSource
 {
     [Header("References")]
-    [Tooltip("The CenterEyeAnchor transform from the OVR Camera Rig")]
+    [Tooltip("The head camera transform from the XR rig")]
     public Transform centerEyeAnchor;
 
     [Header("Sampling Settings")]

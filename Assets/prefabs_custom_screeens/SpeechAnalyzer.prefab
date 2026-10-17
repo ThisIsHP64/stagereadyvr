@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 506650284454113540}
   - component: {fileID: 922349793622591167}
+  - component: {fileID: 646199591427396810}
   m_Layer: 0
   m_Name: SpeechAnalyzer
   m_TagString: Untagged
@@ -44,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1f847e4fc2f501a4bb778c9c9da6858e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dictation: {fileID: 0}
+  transcriber: {fileID: 646199591427396810}
   feedbackController: {fileID: 0}
   microphoneDevice: 
   volumeSampleRate: 0.1
@@ -65,3 +66,15 @@ MonoBehaviour:
   - okay
   - well
   - hmm
+--- !u!114 &646199591427396810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7811152267169697633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c0e48880c1a830cd2a06a3c24fe4f005, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
