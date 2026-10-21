@@ -216,7 +216,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.xr.picoxr": {
-      "version": "file:/home/thisishp64/UnitySDKs/PICO-3.4.0",
+      "version": "file:../ThirdParty/PICO-3.4.0",
       "depth": 0,
       "source": "local",
       "dependencies": {

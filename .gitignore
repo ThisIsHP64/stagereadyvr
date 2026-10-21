@@ -125,3 +125,9 @@ InitTestScene*.unity*
 
 # local claude code settings
 /.claude/settings.local.json
+
+# PICO SDK is proprietary and must not be redistributed, see README
+/ThirdParty/
+
+# local editor preferences
+/.vscode/

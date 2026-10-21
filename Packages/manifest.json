@@ -10,7 +10,7 @@
     "com.unity.ugui": "1.0.0",
     "com.unity.visualscripting": "1.9.4",
     "com.unity.xr.openxr": "1.14.3",
-    "com.unity.xr.picoxr": "file:/home/thisishp64/UnitySDKs/PICO-3.4.0",
+    "com.unity.xr.picoxr": "file:../ThirdParty/PICO-3.4.0",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",
