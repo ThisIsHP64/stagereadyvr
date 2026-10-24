@@ -44,6 +44,31 @@ Secrets are never committed. The coaching service reads the Anthropic API key fr
 
 The file is already covered by `.gitignore`. A key bundled into a build can be extracted from the APK, so this is for development and internal testing only. A shared deployment should use a relay server that holds the key.
 
+## Importing files
+
+A speaker can send a `.txt` speech script or a `.pdf` exported from their presentation to the headset over Wi-Fi. This stores the files only. Showing them (teleprompter, slide rendering) is separate work.
+
+The main menu has an **Import Files** button (below the three environments) that opens the import screen. It shows the address and PIN, lists the newest imports and has a Back button. The screen is built by `StageReadyVR > Build Import Screen` (`Assets/Editor/ImportScreenBuilder.cs`), which can be re-run safely.
+
+How it works:
+
+1. A screen with an `ImportController` (`Assets/Scripts/Import/`) calls `BeginImport()` and shows `Url` and `Pin` to the user.
+2. On a laptop or phone on the same Wi-Fi, the user opens the URL, types the PIN, picks a file and uploads it.
+3. The file is validated and saved under `Application.persistentDataPath/Imports/`. The controller raises `Imported` or `Failed` with a message that is safe to show.
+4. `EndImport()` stops the server. It also stops on disable and when the headset sleeps.
+
+Reading the files back goes through `ImportStore` (`List`, `TryReadText`, `GetPresentationPath`, `Delete`).
+
+Limits: `.txt` must be UTF-8 and non empty, up to 1 MB. `.pdf` must be a real PDF, up to 25 MB. Anything else is refused with a clear message.
+
+Security notes: the server only listens while an import screen is open, every upload needs the per-session PIN (5 wrong tries lock it), and requests with an unexpected `Host` or `Origin` are rejected. Files are stored under generated names, never the uploaded name. The transfer is plain HTTP on the local network, so the PIN and file are not encrypted in transit. Use it on a network you trust.
+
+Run the unit tests (validator, store and a loopback server) with:
+
+```
+Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults Builds/test-results.xml
+```
+
 ## Project layout
 
 | Path | Contents |
