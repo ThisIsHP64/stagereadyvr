@@ -39,10 +39,22 @@ The PICO Unity Integration SDK is proprietary. Its license forbids redistributio
 
 Secrets are never committed. The coaching service reads the Anthropic API key from a local text file:
 
-1. Create `Assets/Resources/anthropic_key.txt`.
+1. Create `AssetUnity 2022.3.62f3s/Resources/anthropic_key.txt`.
 2. Paste only the key into it, with no quotes and no trailing newline.
 
 The file is already covered by `.gitignore`. A key bundled into a build can be extracted from the APK, so this is for development and internal testing only. A shared deployment should use a relay server that holds the key.
+
+## AssemblyAI speech transcription
+
+Speech transcription uses AssemblyAI's realtime WebSocket service. The project sends microphone audio as mono 16 kHz PCM and passes interim and finalized turns into `SpeechAnalyzer`, which calculates word count, pace, filler words and pauses for the feedback dashboard.
+
+For local development only:
+
+1. Create `Assets/Resources/assemblyai_key.txt`.
+2. Paste only the AssemblyAI API key into it, with no quotes or spaces.
+3. Keep the file local. The existing `.gitignore` rule for `*_key.txt` excludes it from Git.
+
+The headset needs an internet connection while a presentation is running. If the key is missing, the microphone is unavailable or the connection fails, the session continues safely without transcription and logs a warning. Do not ship a production APK containing the key; use a relay service that keeps the AssemblyAI credential off the device.
 
 ## Importing files
 
