@@ -78,6 +78,10 @@ namespace StageReadyVR.Feedback
 
         // --- computed by ScoreCalculator (filled in post-session) ---
         public SessionScores scores;
+        // REQ-3 AI scores are separate from the existing calculated scores.
+        public StageReadyVR.PerformanceScoring.PerformanceScores req3AiScores;
+        public string req3AiStatus = "not_requested";
+        public string req3AiError = "";
 
         public List<TimelineEvent> events = new List<TimelineEvent>();
 
