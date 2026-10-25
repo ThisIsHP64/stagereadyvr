@@ -33,6 +33,11 @@ namespace StageReadyVR.Feedback
         private IDistractorMetricsSource Distractors => distractorSource as IDistractorMetricsSource;
 
         public SessionReport CurrentReport => _report;
+        public void ShowReq3Status(SessionReport report)
+        {
+            if (report == _report && dashboard != null)
+                dashboard.ShowReq3Status(report);
+        }
 
         public void BeginSession(string environmentName, string audienceMode = "", string scenario = "")
         {

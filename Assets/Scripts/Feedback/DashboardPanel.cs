@@ -195,6 +195,24 @@ namespace StageReadyVR.Feedback
         }
 
 
+        public void ShowReq3Status(SessionReport report)
+        {
+            if (report == null || summaryText == null) return;
+            string status = report.req3AiStatus;
+            string detail;
+            if (status == "completed" && report.req3AiScores != null)
+            {
+                var s = report.req3AiScores;
+                detail = $"GPT-6 Luna: Eye {s.eyeContact}/100 | Fillers {s.fillerWords}/100 | " +
+                         $"Confidence {s.confidence}/100 | Pace {s.speechPacing}/100\n" +
+                         (s.feedback ?? "").Replace("<", "‹").Replace(">", "›");
+            }
+            else if (status == "failed")
+                detail = "AI scoring unavailable: " + (report.req3AiError ?? "Please try again.");
+            else
+                detail = "AI performance scoring in progress...";
+            summaryText.text = BuildSummary(report) + "\n" + detail;
+        }
         private static string BuildSummary(SessionReport r)
         {
             var sb = new StringBuilder();

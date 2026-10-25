@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using StageReadyVR.Controllers;
@@ -209,6 +209,9 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         }
 
         feedbackController?.EndSession();
+        if (feedbackController != null)
+            StageReadyVR.PerformanceScoring.REQ3SessionScoringBridge.OnSessionEnded(
+                feedbackController.CurrentReport, feedbackController);
 
         Debug.Log("[SessionManager] Session ended.");
     }
