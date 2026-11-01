@@ -91,12 +91,17 @@ namespace StageReadyVR.Feedback
             if (gradeLabel != null) gradeLabel.text = ScoreCalculator.Grade(s.overall);
 
             float[] vals = { s.pace, s.fillerControl, s.eyeContact, s.volume, s.composure };
-            string[] names = { "Pace", "Filler control", "Eye contact", "Volume", "Composure" };
+            string[] names = { "Pace", "Filler control", "Audience facing", "Volume", "Composure" };
 
             for (int i = 0; i < barFills.Length && i < vals.Length; i++)
             {
                 if (barLabels != null && i < barLabels.Length && barLabels[i] != null)
-                    barLabels[i].text = $"{names[i]}  {Mathf.RoundToInt(vals[i])}";
+                {
+                    bool demo = (i == 0 && report.hybridPaceSource == "manual_demo") ||
+                                (i == 1 && report.hybridFillerSource == "manual_demo") ||
+                                (i == 3 && report.hybridVolumeSource == "manual_demo");
+                    barLabels[i].text = $"{names[i]}  {Mathf.RoundToInt(vals[i])}" + (demo ? " [DEMO]" : "");
+                }
             }
 
             if (summaryText != null) summaryText.text = BuildSummary(report);
@@ -136,7 +141,7 @@ namespace StageReadyVR.Feedback
             // Summary as a short neutral paragraph.
             if (strengthsText != null)
             {
-                string summary = string.IsNullOrEmpty(fb.summary) ? "" : fb.summary + "\n\n";
+                string summary = string.IsNullOrEmpty(fb.summary) ? "" : EscapeMarkup(fb.summary) + "\n\n";
                 strengthsText.text =
                     summary +
                     "<b><color=#269244>Strengths</color></b>\n" +         // green
@@ -155,8 +160,14 @@ namespace StageReadyVR.Feedback
             var sb = new StringBuilder();
             foreach (var item in items)
                 sb.Append("<color=").Append(hex).Append(">\u2022</color> ")
-                  .Append(item).Append('\n');
+                  .Append(EscapeMarkup(item)).Append('\n');
             return sb.ToString().TrimEnd();
+        }
+
+        // Protect TMP rich text from accidental or malicious AI-provided tags.
+        private static string EscapeMarkup(string value)
+        {
+            return (value ?? "").Replace("<", "‹").Replace(">", "›");
         }
 
         private System.Collections.IEnumerator AnimateFills(SessionScores s, float[] vals)
@@ -217,8 +228,12 @@ namespace StageReadyVR.Feedback
         {
             var sb = new StringBuilder();
             sb.AppendLine($"<b>{r.environmentName}</b>  ·  {Mathf.RoundToInt(r.durationSeconds)}s");
-            sb.AppendLine($"Words: {r.totalWords}   ·   Avg pace: {Mathf.RoundToInt(r.averageWpm)} wpm");
-            sb.AppendLine($"Filler words: {r.fillerWordCount}   ·   Eye contact: {Mathf.RoundToInt(r.eyeContactRatio * 100)}%");
+            string paceMarker = r.hybridPaceSource == "manual_demo" ? " [DEMO]" : "";
+            string fillerMarker = r.hybridFillerSource == "manual_demo" ? " [DEMO]" : "";
+            string volumeMarker = r.hybridVolumeSource == "manual_demo" ? " [DEMO]" : "";
+            sb.AppendLine($"Words: {r.totalWords}{paceMarker}   ·   Avg pace: {Mathf.RoundToInt(r.averageWpm)} wpm{paceMarker}");
+            sb.AppendLine($"Filler words: {r.fillerWordCount}{fillerMarker}   ·   Audience facing: {Mathf.RoundToInt(r.eyeContactRatio * 100)}%");
+            if (volumeMarker.Length > 0) sb.AppendLine("Volume metric uses a DEMO value.");
             if (r.distractorsFired > 0)
                 sb.AppendLine($"Distractors handled: {r.distractorsRecoveredQuickly}/{r.distractorsFired}");
             return sb.ToString();

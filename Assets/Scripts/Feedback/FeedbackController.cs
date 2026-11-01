@@ -1,4 +1,8 @@
+using System;
+using System.Collections;
 using System.IO;
+using UnityEngine.Networking;
+using StageReadyVR.HybridScoring;
 using UnityEngine;
 
 namespace StageReadyVR.Feedback
@@ -21,6 +25,11 @@ namespace StageReadyVR.Feedback
         [SerializeField] private DashboardPanel dashboard;
         [SerializeField] private StageReadyVR.Coaching.CoachingService coachingService;
 
+        [Header("REQ-3 Hybrid (Unity Editor prototype)")]
+        [Tooltip("One deterministic score + OpenAI coaching. Disables the old Anthropic coaching path.")]
+        [SerializeField] private bool useHybridOpenAiCoaching = true;
+        [SerializeField] private HybridManualOverrides manualMetricFallback = new HybridManualOverrides();
+
         [Header("Logging")]
         [SerializeField] private bool persistJson = true;
 
@@ -33,6 +42,7 @@ namespace StageReadyVR.Feedback
         private IDistractorMetricsSource Distractors => distractorSource as IDistractorMetricsSource;
 
         public SessionReport CurrentReport => _report;
+        public bool UseHybridOpenAiCoaching => useHybridOpenAiCoaching;
         public void ShowReq3Status(SessionReport report)
         {
             if (report == _report && dashboard != null)
@@ -65,12 +75,22 @@ namespace StageReadyVR.Feedback
             _report.durationSeconds = Time.time - _startTime;
 
             PullMetrics();
+            if (useHybridOpenAiCoaching && manualMetricFallback != null)
+                manualMetricFallback.Apply(_report);
             ScoreCalculator.Calculate(_report);
 
             if (persistJson) Persist(_report);
             if (dashboard != null) dashboard.Show(_report);
-            // Fire the LLM coaching call; dashboard shows a loading state until
-            // the response returns, then ShowCoaching populates it.
+
+            // Option C: Unity's ScoreCalculator is authoritative. OpenAI may
+            // describe the score, but cannot create a competing set of numbers.
+            if (useHybridOpenAiCoaching)
+            {
+                StartCoroutine(GetHybridOpenAiCoaching(_report));
+                return;
+            }
+
+            // Legacy Anthropic coaching is available only when Hybrid is off.
             if (coachingService != null)
             {
                 coachingService.GetCoaching(_report, fb =>
@@ -85,6 +105,43 @@ namespace StageReadyVR.Feedback
                     if (persistJson) Persist(_report);
                 });
             }
+        }
+
+        private IEnumerator GetHybridOpenAiCoaching(SessionReport report)
+        {
+#if UNITY_EDITOR
+            string key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            string error;
+            UnityWebRequest req = HybridOpenAIClient.CreateRequest(report, key, out error);
+            if (req == null)
+            {
+                if (dashboard != null) dashboard.ShowCoaching(HybridOpenAIClient.Failure(error));
+                Debug.LogWarning("[Hybrid REQ-3] " + error);
+                yield break;
+            }
+
+            using (req)
+            {
+                Debug.Log("[Hybrid REQ-3] Requesting OpenAI coaching for score " + report.scores.overall + "/100.");
+                yield return req.SendWebRequest();
+                var feedback = HybridOpenAIClient.ReadResponse(req);
+                if (dashboard != null) dashboard.ShowCoaching(feedback);
+                if (!feedback.ok)
+                {
+                    Debug.LogWarning("[Hybrid REQ-3] Coaching failed: " + feedback.error);
+                    yield break;
+                }
+                report.coachingSummary = feedback.summary;
+                report.coachingStrengths = feedback.strengths;
+                report.coachingRecommendations = feedback.recommendations;
+                if (persistJson) Persist(report);
+                Debug.Log("[Hybrid REQ-3] OpenAI coaching completed. Overall Unity score: " + report.scores.overall);
+            }
+#else
+            if (dashboard != null)
+                dashboard.ShowCoaching(HybridOpenAIClient.Failure("Headset API requires a secure relay; editor test only."));
+            yield break;
+#endif
         }
 
         private void PullMetrics()

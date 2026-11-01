@@ -71,6 +71,14 @@ namespace StageReadyVR.Feedback
 
         public string transcript = "";
 
+        // REQ-3 Hybrid: source labels prevent simulated values being presented as
+        // measurements from a real VR presentation ("live", "manual_demo", "demo").
+        public string hybridPaceSource = "live";
+        public string hybridFillerSource = "live";
+        public string hybridVolumeSource = "live";
+        public string hybridAudienceFacingSource = "live";
+        public string hybridComposureSource = "live";
+
         // --- LLM coaching (populated after the API responds) ---
         public string coachingSummary = "";
         public string[] coachingStrengths;

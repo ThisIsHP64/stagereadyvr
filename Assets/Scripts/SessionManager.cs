@@ -209,7 +209,9 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         }
 
         feedbackController?.EndSession();
-        if (feedbackController != null)
+        // Only run the old AI-generated scores when explicitly using legacy mode.
+        // Hybrid Option C uses ScoreCalculator and OpenAI coaching in FeedbackController.
+        if (feedbackController != null && !feedbackController.UseHybridOpenAiCoaching)
             StageReadyVR.PerformanceScoring.REQ3SessionScoringBridge.OnSessionEnded(
                 feedbackController.CurrentReport, feedbackController);
 
