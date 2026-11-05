@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 import assemblyai as aai
 
-key_path = Path("Assets/Resources/assmeblyai_key.txt")
+key_path = Path("Assets/Resources/assemblyai_key.txt")
 aai.settings.api_key = key_path.read_text().strip()
 
 audio_file = sys.argv[1]
