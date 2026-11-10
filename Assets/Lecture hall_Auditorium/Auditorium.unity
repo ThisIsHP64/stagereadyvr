@@ -1710,6 +1710,7 @@ GameObject:
   m_Component:
   - component: {fileID: 376386943}
   - component: {fileID: 376386942}
+  - component: {fileID: 376386944}
   m_Layer: 0
   m_Name: SessionManager
   m_TagString: Untagged
@@ -1759,6 +1760,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &376386944
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 376386941}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fb23e2a30b3a4f66be434d0eed52eee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speechText: "Welcome everyone to today\u2019s presentation.\n\nMain Idea\n- Explain
+    the problem\n- Show the proposed solution\n- Describe the expected result\n\nConclusion\nThank
+    you for listening."
+  displayMode: 0
+  cameraAnchor: {fileID: 0}
+  distanceFromCamera: 1.8
+  verticalOffset: -0.05
+  panelColor: {r: 0.04, g: 0.05, b: 0.08, a: 0.94}
+  textColor: {r: 0.96, g: 0.97, b: 1, a: 1}
+  textSize: 30
 --- !u!1 &394661243
 GameObject:
   m_ObjectHideFlags: 0
@@ -10032,6 +10055,19 @@ MonoBehaviour:
   distractorSource: {fileID: 376386942}
   dashboard: {fileID: 548754877}
   coachingService: {fileID: 525316229}
+  useHybridOpenAiCoaching: 1
+  manualMetricFallback:
+    enabled: 1
+    fillMissingPace: 1
+    forcePaceOverride: 0
+    demoWordsPerMinute: 138
+    demoWpmStandardDeviation: 15
+    fillMissingFillers: 1
+    forceFillerOverride: 0
+    demoFillerWordCount: 4
+    fillMissingVolume: 1
+    forceVolumeOverride: 0
+    demoVolumeDb: -20
   persistJson: 1
 --- !u!4 &1563833689
 Transform:
