@@ -25,6 +25,48 @@ namespace StageReadyVR.Import
         [SerializeField] TMP_Text pinText;
         [SerializeField] TMP_Text statusText;
         [SerializeField] TMP_Text filesText;
+        [Tooltip("Shows which imported pdf is projected during sessions")]
+        [SerializeField] TMP_Text presentationText;
+
+        /// <summary>Steps the projected deck through none and each imported pdf, for a menu button.</summary>
+        public void CyclePresentation()
+        {
+            if (controller == null) return;
+
+            ImportStore store = controller.Store;
+            ImportedFile current = store.GetActivePresentation();
+            string next = NextPresentationId(store.List(), current != null ? current.id : null);
+
+            if (!store.SetActivePresentation(next))
+                SetText(statusText, "The presentation choice could not be saved. Try again.");
+            Refresh();
+        }
+
+        /// <summary>
+        /// The id after currentId in the order none, then each presentation as listed,
+        /// then none again. Scripts are skipped. Null means none.
+        /// </summary>
+        public static string NextPresentationId(IReadOnlyList<ImportedFile> files, string currentId)
+        {
+            var decks = new List<string>();
+            if (files != null)
+            {
+                foreach (ImportedFile f in files)
+                {
+                    if (f != null && f.kind == ImportKind.Presentation) decks.Add(f.id);
+                }
+            }
+            if (decks.Count == 0) return null;
+
+            // an unknown current id behaves like none so the cycle restarts at the first deck
+            int at = string.IsNullOrEmpty(currentId) ? -1 : decks.IndexOf(currentId);
+            return at + 1 < decks.Count ? decks[at + 1] : null;
+        }
+
+        public static string FormatPresentation(ImportedFile active)
+        {
+            return "Presentation: " + (active != null ? active.displayName : "none");
+        }
 
         public void Open()
         {
@@ -82,6 +124,7 @@ namespace StageReadyVR.Import
             SetText(urlText, running ? controller.Url : string.Empty);
             SetText(pinText, running ? "PIN " + controller.Pin : string.Empty);
             SetText(filesText, controller != null ? FormatList(controller.Store.List(), MaxListed) : string.Empty);
+            SetText(presentationText, controller != null ? FormatPresentation(controller.Store.GetActivePresentation()) : string.Empty);
         }
 
         /// <summary>Lists imports as one line each, newest first, with a note when more exist.</summary>

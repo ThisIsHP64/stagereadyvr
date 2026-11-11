@@ -8,6 +8,8 @@ public class PauseManager : MonoBehaviour
     public GameObject pauseMenuCanvas;
     private bool isPaused = false;
 
+    public bool IsPaused => isPaused;
+
     void Start()
     {
         if (pauseMenuCanvas != null)

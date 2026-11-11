@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using StageReadyVR.Controllers;
 using StageReadyVR.Feedback;
+using StageReadyVR.Presentation;
 
 /// <summary>
 /// Manages the full session lifecycle:
@@ -48,12 +49,19 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
     [Header("Audience")]
     public AudienceManager audienceManager;
 
+    [Header("Presentation")]
+    [Tooltip("Optional projector screen; placed behind the player when the session starts")]
+    public ProjectionScreen projectionScreen;
+
     public string environmentName = "Conference Room";
 
     private float timeRemaining;
     
     private bool sessionActive = false;
     private bool sessionEnded = false;
+
+    /// <summary>True between the end of the countdown and the end of the session.</summary>
+    public bool IsSessionActive => sessionActive && !sessionEnded;
 
     // distractor tracking (wire your distractor system to these)
     private int distractorsFired = 0;
@@ -119,6 +127,10 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
             sessionHUD.SetActive(true);
             PositionHUD();
         }
+
+        // placed now rather than at scene load because the head pose is only reliable once tracking settles
+        if (projectionScreen != null && centerEyeAnchor != null)
+            projectionScreen.Place(centerEyeAnchor);
 
         Debug.Log("[SessionManager] about to BeginSession, feedbackController null? " + (feedbackController == null));
         feedbackController?.BeginSession(environmentName, audienceManager != null ? audienceManager.audienceMode.ToString() : "",

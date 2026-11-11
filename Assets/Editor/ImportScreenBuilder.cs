@@ -68,8 +68,11 @@ public static class ImportScreenBuilder
         TMP_Text status = Text(rect, "Status", string.Empty, 22, Light, FontStyles.Normal, font, 0, 50, 700);
         Text(rect, "FilesHeader", "Imported files", 24, Light, FontStyles.Bold, font, -45, 36, 700);
         TMP_Text files = Text(rect, "Files", string.Empty, 22, Light, FontStyles.Normal, font, -125, 120, 700);
+        TMP_Text presentation = Text(rect, "Presentation", string.Empty, 22, Light, FontStyles.Bold, font, -202, 30, 700);
 
-        Button back = NewButton(rect, "BackButton", "Back", font, -250, 300);
+        // side by side so the panel keeps its original height
+        Button change = NewButton(rect, "PresentationButton", "Change Presentation", font, -250, 320, -170);
+        Button back = NewButton(rect, "BackButton", "Back", font, -250, 320, 170);
 
         // behaviour
         var controller = panel.AddComponent<ImportController>();
@@ -83,8 +86,10 @@ public static class ImportScreenBuilder
         so.FindProperty("pinText").objectReferenceValue = pin;
         so.FindProperty("statusText").objectReferenceValue = status;
         so.FindProperty("filesText").objectReferenceValue = files;
+        so.FindProperty("presentationText").objectReferenceValue = presentation;
         so.ApplyModifiedPropertiesWithoutUndo();
 
+        UnityEventTools.AddPersistentListener(change.onClick, screen.CyclePresentation);
         UnityEventTools.AddPersistentListener(back.onClick, screen.Close);
 
         // entry point on the main menu, below the three environment buttons
@@ -134,7 +139,7 @@ public static class ImportScreenBuilder
         return t;
     }
 
-    static Button NewButton(RectTransform parent, string name, string label, TMP_FontAsset font, float y, float width)
+    static Button NewButton(RectTransform parent, string name, string label, TMP_FontAsset font, float y, float width, float x = 0f)
     {
         var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         go.layer = parent.gameObject.layer;
@@ -142,7 +147,7 @@ public static class ImportScreenBuilder
 
         var rt = (RectTransform)go.transform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, y);
+        rt.anchoredPosition = new Vector2(x, y);
         rt.sizeDelta = new Vector2(width, 60f);
 
         var image = go.GetComponent<Image>();

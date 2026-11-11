@@ -54,7 +54,7 @@ namespace StageReadyVR.Import.Tests
             Assert.IsNotNull(screen);
 
             var so = new SerializedObject(screen);
-            foreach (string field in new[] { "controller", "menuPanel", "instructionText", "urlText", "pinText", "statusText", "filesText" })
+            foreach (string field in new[] { "controller", "menuPanel", "instructionText", "urlText", "pinText", "statusText", "filesText", "presentationText" })
                 Assert.IsNotNull(so.FindProperty(field).objectReferenceValue, field + " is not assigned");
 
             Assert.AreEqual("EnvironmentPanel", ((GameObject)so.FindProperty("menuPanel").objectReferenceValue).name);
@@ -71,6 +71,16 @@ namespace StageReadyVR.Import.Tests
 
             AssertCalls(open, screen, "Open");
             AssertCalls(back, screen, "Close");
+        }
+
+        [Test]
+        public void PresentationButtonCyclesTheProjectedDeck()
+        {
+            Transform panel = canvas.Find("ImportPanel");
+            var screen = panel.GetComponent<ImportScreen>();
+            Transform change = panel.Find("PresentationButton");
+            Assert.IsNotNull(change, "PresentationButton is missing, run StageReadyVR > Build Import Screen.");
+            AssertCalls(change.GetComponent<Button>(), screen, "CyclePresentation");
         }
 
         [Test]

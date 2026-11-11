@@ -125,5 +125,70 @@ namespace StageReadyVR.Import.Tests
             SaveResult r = store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
             Assert.IsFalse(store.TryReadText(r.File.id, out _, out _));
         }
+
+        [Test]
+        public void NoActivePresentationByDefault()
+        {
+            store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
+            Assert.IsNull(store.GetActivePresentation());
+        }
+
+        [Test]
+        public void ActivePresentationSurvivesReloadAndLaterImports()
+        {
+            SaveResult deck = store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
+            Assert.IsTrue(store.SetActivePresentation(deck.File.id));
+
+            store.Save(Text("later"), "later.txt");
+
+            ImportedFile active = new ImportStore(dir).GetActivePresentation();
+            Assert.IsNotNull(active);
+            Assert.AreEqual(deck.File.id, active.id);
+        }
+
+        [Test]
+        public void ScriptCannotBeActivePresentation()
+        {
+            SaveResult script = store.Save(Text("words"), "talk.txt");
+            Assert.IsFalse(store.SetActivePresentation(script.File.id));
+            Assert.IsFalse(store.SetActivePresentation("not-an-id"));
+            Assert.IsNull(store.GetActivePresentation());
+        }
+
+        [Test]
+        public void ClearingActivePresentationWorks()
+        {
+            SaveResult deck = store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
+            store.SetActivePresentation(deck.File.id);
+            Assert.IsTrue(store.SetActivePresentation(null));
+            Assert.IsNull(store.GetActivePresentation());
+        }
+
+        [Test]
+        public void DeletingActivePresentationClearsIt()
+        {
+            SaveResult deck = store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
+            store.SetActivePresentation(deck.File.id);
+            store.Delete(deck.File.id);
+            Assert.IsNull(store.GetActivePresentation());
+        }
+
+        [Test]
+        public void ActivePresentationWithMissingFileReadsAsNone()
+        {
+            SaveResult deck = store.Save(ImportValidatorTests.MinimalPdf(), "deck.pdf");
+            store.SetActivePresentation(deck.File.id);
+            File.Delete(Path.Combine(dir, deck.File.storedFileName));
+            Assert.IsNull(store.GetActivePresentation());
+        }
+
+        [Test]
+        public void TamperedActiveIdIsIgnored()
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "index.json"),
+                "{\"files\":[],\"activePresentationId\":\"../../secret\"}");
+            Assert.IsNull(store.GetActivePresentation());
+        }
     }
 }

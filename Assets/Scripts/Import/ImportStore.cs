@@ -27,6 +27,9 @@ namespace StageReadyVR.Import
     internal sealed class ImportIndex
     {
         public List<ImportedFile> files = new List<ImportedFile>();
+
+        // empty means no deck is projected; JsonUtility writes null strings as empty
+        public string activePresentationId = string.Empty;
     }
 
     /// <summary>
@@ -164,6 +167,52 @@ namespace StageReadyVR.Import
             return Path.Combine(root, entry.storedFileName);
         }
 
+        /// <summary>
+        /// Chooses the deck projected during sessions. Null or empty clears it.
+        /// Returns false when the id is not an existing presentation or the index cannot be written.
+        /// </summary>
+        public bool SetActivePresentation(string id)
+        {
+            lock (gate)
+            {
+                ImportIndex index = LoadIndex();
+                string next = string.Empty;
+
+                if (!string.IsNullOrEmpty(id))
+                {
+                    ImportedFile entry = index.files.Find(f => f.id == id);
+                    if (entry == null || entry.kind != ImportKind.Presentation) return false;
+                    if (!File.Exists(Path.Combine(root, entry.storedFileName))) return false;
+                    next = id;
+                }
+
+                index.activePresentationId = next;
+                try
+                {
+                    Directory.CreateDirectory(root);
+                    WriteReplacing(IndexPath, System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(index)));
+                    return true;
+                }
+                catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("[ImportStore] selecting presentation failed: " + e.Message);
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>The deck chosen for sessions, or null when none is chosen or its file is gone.</summary>
+        public ImportedFile GetActivePresentation()
+        {
+            string id;
+            lock (gate) id = LoadIndex().activePresentationId;
+            if (string.IsNullOrEmpty(id)) return null;
+
+            // the lookup only returns entries whose file exists, so a stale id reads as none
+            ImportedFile entry = Get(id);
+            return entry != null && entry.kind == ImportKind.Presentation ? entry : null;
+        }
+
         public bool Delete(string id)
         {
             lock (gate)
@@ -174,6 +223,7 @@ namespace StageReadyVR.Import
 
                 string path = Path.Combine(root, index.files[at].storedFileName);
                 index.files.RemoveAt(at);
+                if (index.activePresentationId == id) index.activePresentationId = string.Empty;
 
                 try
                 {
@@ -211,6 +261,11 @@ namespace StageReadyVR.Import
                         && StoredNamePattern.IsMatch(entry.storedFileName);
                     if (sane) index.files.Add(entry);
                 }
+
+                // only keep an id that still names a surviving entry
+                string active = loaded.activePresentationId;
+                if (!string.IsNullOrEmpty(active) && index.files.Exists(f => f.id == active))
+                    index.activePresentationId = active;
             }
             catch (Exception e)
             {

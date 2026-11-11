@@ -93,5 +93,41 @@ namespace StageReadyVR.Import.Tests
         {
             Assert.AreEqual(expected, ImportScreen.FormatSize(bytes));
         }
+
+        [Test]
+        public void PresentationCycleGoesNoneThenEachDeckThenNone()
+        {
+            var list = new List<ImportedFile>
+            {
+                File("a.pdf", ImportKind.Presentation, 1),
+                File("talk.txt", ImportKind.Script, 1),
+                File("b.pdf", ImportKind.Presentation, 1)
+            };
+            Assert.AreEqual("a.pdf", ImportScreen.NextPresentationId(list, null));
+            Assert.AreEqual("b.pdf", ImportScreen.NextPresentationId(list, "a.pdf"));
+            Assert.IsNull(ImportScreen.NextPresentationId(list, "b.pdf"));
+        }
+
+        [Test]
+        public void PresentationCycleWithNoDecksStaysNone()
+        {
+            var list = new List<ImportedFile> { File("talk.txt", ImportKind.Script, 1) };
+            Assert.IsNull(ImportScreen.NextPresentationId(list, null));
+            Assert.IsNull(ImportScreen.NextPresentationId(null, null));
+        }
+
+        [Test]
+        public void PresentationCycleRestartsFromUnknownId()
+        {
+            var list = new List<ImportedFile> { File("a.pdf", ImportKind.Presentation, 1) };
+            Assert.AreEqual("a.pdf", ImportScreen.NextPresentationId(list, "deleted"));
+        }
+
+        [Test]
+        public void PresentationLabelNamesDeckOrNone()
+        {
+            Assert.AreEqual("Presentation: none", ImportScreen.FormatPresentation(null));
+            Assert.AreEqual("Presentation: deck.pdf", ImportScreen.FormatPresentation(File("deck.pdf", ImportKind.Presentation, 1)));
+        }
     }
 }

@@ -19,7 +19,8 @@ namespace StageReadyVR.Controllers
         LeftPrimary,      // X
         RightPrimary,     // A
         RightSecondary,   // B
-        AnyPrimary        // A or X
+        AnyPrimary,       // A or X
+        RightTrigger      // appended last so stored enum values keep their meaning
     }
 
     /// <summary>
@@ -54,6 +55,7 @@ namespace StageReadyVR.Controllers
         private static ISButton _isLeftPrimary;
         private static ISButton _isRightPrimary;
         private static ISButton _isRightSecondary;
+        private static ISButton _isRightTrigger;
         private static int _nextResolveFrame;
 
         /// <summary>True only on the first frame the button is pressed.</summary>
@@ -107,6 +109,9 @@ namespace StageReadyVR.Controllers
                 case ControllerButton.RightSecondary:
                     return ReadLegacy(ref _right, RightHand, CommonUsages.secondaryButton)
                         || IsPressed(_isRightSecondary);
+                case ControllerButton.RightTrigger:
+                    return ReadLegacy(ref _right, RightHand, CommonUsages.triggerButton)
+                        || IsPressed(_isRightTrigger);
                 case ControllerButton.AnyPrimary:
                     return ReadLegacy(ref _left, LeftHand, CommonUsages.primaryButton)
                         || ReadLegacy(ref _right, RightHand, CommonUsages.primaryButton)
@@ -146,9 +151,11 @@ namespace StageReadyVR.Controllers
             _isLeftPrimary = FindControl("LeftHand", "primaryButton", "X");
             _isRightPrimary = FindControl("RightHand", "primaryButton", "A");
             _isRightSecondary = FindControl("RightHand", "secondaryButton", "B");
+            _isRightTrigger = FindControl("RightHand", "triggerPressed", "triggerButton");
 
             bool allFound = _isLeftMenu != null && _isLeftPrimary != null
-                         && _isRightPrimary != null && _isRightSecondary != null;
+                         && _isRightPrimary != null && _isRightSecondary != null
+                         && _isRightTrigger != null;
             _nextResolveFrame = frame + (allFound ? ResolveSettledFrames : ResolveRetryFrames);
         }
 
