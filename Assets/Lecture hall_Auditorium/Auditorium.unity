@@ -360,6 +360,75 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec0b4dd729a12d046982652f834580a2, type: 3}
   m_Name: Auditorium_LMA6
   m_EditorClassIdentifier: 
+--- !u!1 &52250639
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 52250642}
+  - component: {fileID: 52250641}
+  - component: {fileID: 52250640}
+  m_Layer: 0
+  m_Name: ProjectionScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &52250640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 52250639}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41e4e72b6cf041f7a234748283536574, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  projectionScreen: {fileID: 52250641}
+  sessionManager: {fileID: 376386942}
+  pauseManager: {fileID: 1024024863}
+--- !u!114 &52250641
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 52250639}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71a2c9b24a73475bb49d860fef6b3451, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anchor: {fileID: 0}
+  distanceBehind: 2.5
+  heightAboveHead: 0.35
+  maxSlideWidth: 3.2
+  maxSlideHeight: 1.8
+  bezel: 0.06
+  renderEdge: 1920
+  bezelColor: {r: 0.03, g: 0.03, b: 0.04, a: 1}
+  textColor: {r: 0.92, g: 0.94, b: 0.98, a: 1}
+--- !u!4 &52250642
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 52250639}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &78363323
 GameObject:
   m_ObjectHideFlags: 0
@@ -1744,6 +1813,7 @@ MonoBehaviour:
   sessionDuration: 0
   countdownStartDelay: 1.5
   audienceManager: {fileID: 117176585}
+  projectionScreen: {fileID: 52250641}
   environmentName: Auditorium
 --- !u!4 &376386943
 Transform:
@@ -13056,3 +13126,4 @@ SceneRoots:
   - {fileID: 525316228}
   - {fileID: 311562098}
   - {fileID: 1700497780}
+  - {fileID: 52250642}

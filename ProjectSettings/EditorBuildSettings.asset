@@ -5,18 +5,21 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/MainMenu.unity
     guid: b1de67c353dbebc45b5d7484ef6b4c8c
-  - enabled: 1
+  - enabled: 0
     path: Assets/Lecture hall_Auditorium/Auditorium.unity
     guid: 2f24e717ddedb7442a312783c4bf6c2a
-  - enabled: 1
+  - enabled: 0
     path: Assets/Nimikko_UniversityClassroom/Scenes/UniversityClassroom.unity
     guid: 00f2b520c594c7446b0f7d80a2392d80
-  - enabled: 1
+  - enabled: 0
     path: Assets/Conference Room 01_V2/Conference Room 01_V2.unity
     guid: 515571571d03fed41b950a9976c47a1c
+  - enabled: 1
+    path: Assets/Scenes/MicTest.unity
+    guid: be9adc6dc1c6c90489b4c406354fa456
   m_configObjects:
     Unity.XR.PXR.Settings: {fileID: 11400000, guid: 9fc2c969266702134b0a497e2287b268,
       type: 2}

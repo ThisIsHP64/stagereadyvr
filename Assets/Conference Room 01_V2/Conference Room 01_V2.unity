@@ -1541,6 +1541,19 @@ MonoBehaviour:
   distractorSource: {fileID: 733027136}
   dashboard: {fileID: 981183018}
   coachingService: {fileID: 1595695302}
+  useHybridOpenAiCoaching: 1
+  manualMetricFallback:
+    enabled: 1
+    fillMissingPace: 1
+    forcePaceOverride: 0
+    demoWordsPerMinute: 138
+    demoWpmStandardDeviation: 15
+    fillMissingFillers: 1
+    forceFillerOverride: 0
+    demoFillerWordCount: 4
+    fillMissingVolume: 1
+    forceVolumeOverride: 0
+    demoVolumeDb: -20
   persistJson: 1
 --- !u!4 &333009448
 Transform:
@@ -3966,6 +3979,7 @@ MonoBehaviour:
   sessionDuration: 0
   countdownStartDelay: 1.5
   audienceManager: {fileID: 306453504}
+  projectionScreen: {fileID: 967346319}
   environmentName: Conference Room
 --- !u!4 &733027137
 Transform:
@@ -4591,6 +4605,75 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1665330447}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -11.68}
+--- !u!1 &967346317
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 967346320}
+  - component: {fileID: 967346319}
+  - component: {fileID: 967346318}
+  m_Layer: 0
+  m_Name: ProjectionScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &967346318
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 967346317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41e4e72b6cf041f7a234748283536574, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  projectionScreen: {fileID: 967346319}
+  sessionManager: {fileID: 733027136}
+  pauseManager: {fileID: 600564663}
+--- !u!114 &967346319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 967346317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71a2c9b24a73475bb49d860fef6b3451, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anchor: {fileID: 0}
+  distanceBehind: 2.5
+  heightAboveHead: 0.35
+  maxSlideWidth: 3.2
+  maxSlideHeight: 1.8
+  bezel: 0.06
+  renderEdge: 1920
+  bezelColor: {r: 0.03, g: 0.03, b: 0.04, a: 1}
+  textColor: {r: 0.92, g: 0.94, b: 0.98, a: 1}
+--- !u!4 &967346320
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 967346317}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &981183018 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 52263150476247772, guid: 048a44461719db64bac6a308af50a39e,
@@ -10835,3 +10918,4 @@ SceneRoots:
   - {fileID: 2011853215}
   - {fileID: 1297080545}
   - {fileID: 334909301}
+  - {fileID: 967346320}

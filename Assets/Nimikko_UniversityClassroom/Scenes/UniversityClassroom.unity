@@ -4023,6 +4023,19 @@ MonoBehaviour:
   distractorSource: {fileID: 228185691}
   dashboard: {fileID: 478046817}
   coachingService: {fileID: 1696565983}
+  useHybridOpenAiCoaching: 1
+  manualMetricFallback:
+    enabled: 1
+    fillMissingPace: 1
+    forcePaceOverride: 0
+    demoWordsPerMinute: 138
+    demoWpmStandardDeviation: 15
+    fillMissingFillers: 1
+    forceFillerOverride: 0
+    demoFillerWordCount: 4
+    fillMissingVolume: 1
+    forceVolumeOverride: 0
+    demoVolumeDb: -20
   persistJson: 1
 --- !u!4 &169236661
 Transform:
@@ -48925,6 +48938,7 @@ MonoBehaviour:
   sessionDuration: 0
   countdownStartDelay: 1.5
   audienceManager: {fileID: 228185691}
+  projectionScreen: {fileID: 2043182069}
   environmentName: UniversityClassroom
 --- !u!4 &2022760334
 Transform:
@@ -49053,6 +49067,75 @@ MonoBehaviour:
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 0
+--- !u!1 &2043182067
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2043182070}
+  - component: {fileID: 2043182069}
+  - component: {fileID: 2043182068}
+  m_Layer: 0
+  m_Name: ProjectionScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2043182068
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2043182067}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41e4e72b6cf041f7a234748283536574, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  projectionScreen: {fileID: 2043182069}
+  sessionManager: {fileID: 2022760333}
+  pauseManager: {fileID: 1478087869}
+--- !u!114 &2043182069
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2043182067}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71a2c9b24a73475bb49d860fef6b3451, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anchor: {fileID: 0}
+  distanceBehind: 2.5
+  heightAboveHead: 0.35
+  maxSlideWidth: 3.2
+  maxSlideHeight: 1.8
+  bezel: 0.06
+  renderEdge: 1920
+  bezelColor: {r: 0.03, g: 0.03, b: 0.04, a: 1}
+  textColor: {r: 0.92, g: 0.94, b: 0.98, a: 1}
+--- !u!4 &2043182070
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2043182067}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2049371471
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -53123,3 +53206,4 @@ SceneRoots:
   - {fileID: 1696565982}
   - {fileID: 1899517137}
   - {fileID: 243361957}
+  - {fileID: 2043182070}
