@@ -68,15 +68,30 @@ namespace StageReadyVR.Feedback
             _report.AddEvent(Time.time - _startTime, kind, label);
         }
 
-        public void EndSession()
+        public void BindLiveSources(SpeechAnalyzer speech, HeadMovementLogger gaze, SessionManager session)
+        {
+            if (speech != null) speechSource = speech;
+            if (gaze != null) gazeSource = gaze;
+            if (session != null) distractorSource = session;
+        }
+        public void EndSession() { EndSessionAt(Time.time); }
+        public void EndSessionAt(float endedAt)
         {
             if (!_active || _report == null) return;
             _active = false;
-            _report.durationSeconds = Time.time - _startTime;
+            _report.durationSeconds = Mathf.Max(0f, endedAt - _startTime);
 
             PullMetrics();
-            if (useHybridOpenAiCoaching && manualMetricFallback != null)
-                manualMetricFallback.Apply(_report);
+            // Real presentations never substitute demo numbers.
+            var live = speechSource as SpeechAnalyzer;
+            if (live == null || !live.SpeechDataComplete || string.IsNullOrWhiteSpace(_report.transcript) || _report.totalWords <= 0)
+            {
+                _report.hybridPaceSource = "unavailable";
+                _report.hybridFillerSource = "unavailable";
+            }
+            if (_report.averageVolumeDb <= -79f || _report.averageVolumeDb >= 0f)
+            { _report.averageVolumeDb = -80f; _report.hybridVolumeSource = "unavailable"; }
+            if (Gaze == null) { _report.hybridAudienceFacingSource = "unavailable"; _report.hybridComposureSource = "unavailable"; }
             ScoreCalculator.Calculate(_report);
 
             if (persistJson) Persist(_report);
@@ -109,10 +124,14 @@ namespace StageReadyVR.Feedback
 
         private IEnumerator GetHybridOpenAiCoaching(SessionReport report)
         {
-#if UNITY_EDITOR
-            string key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            if (report.hybridPaceSource != "live" || report.hybridFillerSource != "live" || report.hybridAudienceFacingSource != "live")
+            {
+                if (dashboard != null) dashboard.ShowCoaching(HybridOpenAIClient.Failure("Live speech or tracking was incomplete."));
+                Debug.LogWarning("[LiveSpeech] Incomplete live data; AI coaching skipped.");
+                yield break;
+            }
             string error;
-            UnityWebRequest req = HybridOpenAIClient.CreateRequest(report, key, out error);
+            UnityWebRequest req = LiveSessionRelay.CreateCoachingRequest(report, out error);
             if (req == null)
             {
                 if (dashboard != null) dashboard.ShowCoaching(HybridOpenAIClient.Failure(error));
@@ -125,7 +144,7 @@ namespace StageReadyVR.Feedback
                 Debug.Log("[Hybrid REQ-3] Requesting OpenAI coaching for score " + report.scores.overall + "/100.");
                 yield return req.SendWebRequest();
                 var feedback = HybridOpenAIClient.ReadResponse(req);
-                if (dashboard != null) dashboard.ShowCoaching(feedback);
+                if (dashboard != null && report == _report) dashboard.ShowCoaching(feedback);
                 if (!feedback.ok)
                 {
                     Debug.LogWarning("[Hybrid REQ-3] Coaching failed: " + feedback.error);
@@ -137,11 +156,7 @@ namespace StageReadyVR.Feedback
                 if (persistJson) Persist(report);
                 Debug.Log("[Hybrid REQ-3] OpenAI coaching completed. Overall Unity score: " + report.scores.overall);
             }
-#else
-            if (dashboard != null)
-                dashboard.ShowCoaching(HybridOpenAIClient.Failure("Headset API requires a secure relay; editor test only."));
-            yield break;
-#endif
+
         }
 
         private void PullMetrics()

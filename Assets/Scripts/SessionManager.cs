@@ -64,6 +64,7 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
     
     private bool sessionActive = false;
     private bool sessionEnded = false;
+    private LiveSpeechHud liveSpeechHud;
 
     /// <summary>True between the end of the countdown and the end of the session.</summary>
     public bool IsSessionActive => sessionActive && !sessionEnded;
@@ -114,11 +115,23 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         yield return new WaitForSeconds(1f);
         if (countdownText != null) countdownText.text = "1";
         yield return new WaitForSeconds(1f);
+        if (countdownText != null) countdownText.text = "Preparing microphone… Please wait.";
+        if (speechAnalyzer == null) speechAnalyzer = FindObjectOfType<SpeechAnalyzer>();
+        if (speechAnalyzer == null) speechAnalyzer = gameObject.AddComponent<SpeechAnalyzer>();
+        speechAnalyzer.StartAnalysis();
+        float speechDeadline = Time.realtimeSinceStartup + 45f;
+        while (!speechAnalyzer.LiveSpeechStartupFinished && Time.realtimeSinceStartup < speechDeadline)
+            yield return null;
+        if (!speechAnalyzer.LiveSpeechReady)
+        {
+            speechAnalyzer.StopAnalysis();
+            Debug.LogWarning("[LiveSpeech] Microphone unavailable; presentation may continue but AI coaching requires complete live data.");
+        }
         if (countdownText != null) countdownText.text = "GO!";
-        yield return new WaitForSeconds(0.5f);
 
-        if (countdownPanel != null) countdownPanel.SetActive(false);
         StartSession();
+        yield return new WaitForSeconds(0.5f);
+        if (countdownPanel != null) countdownPanel.SetActive(false);
     }
 
     void StartSession()
@@ -141,6 +154,8 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         if (teleprompter != null && centerEyeAnchor != null)
             teleprompter.Begin(centerEyeAnchor);
 
+        if (feedbackController == null) feedbackController = FindObjectOfType<FeedbackController>();
+        if (headLogger == null) headLogger = FindObjectOfType<HeadMovementLogger>();
         Debug.Log("[SessionManager] about to BeginSession, feedbackController null? " + (feedbackController == null));
         feedbackController?.BeginSession(environmentName, audienceManager != null ? audienceManager.audienceMode.ToString() : "",
     "");
@@ -148,7 +163,12 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         Debug.Log("[SessionManager] about to StartLogging, headLogger null? " + (headLogger == null));
         if (headLogger != null) headLogger.StartLogging();
 
-        if (speechAnalyzer != null) speechAnalyzer.StartAnalysis();
+        if (speechAnalyzer == null) speechAnalyzer = FindObjectOfType<SpeechAnalyzer>();
+        if (speechAnalyzer == null) speechAnalyzer = gameObject.AddComponent<SpeechAnalyzer>();
+        if (feedbackController != null) feedbackController.BindLiveSources(speechAnalyzer, headLogger, this);
+        speechAnalyzer.MarkPresentationStarted();
+        liveSpeechHud = gameObject.AddComponent<LiveSpeechHud>();
+        liveSpeechHud.Begin(speechAnalyzer, centerEyeAnchor, timerText != null ? timerText.font : null);
     }
 
     void Update()
@@ -224,7 +244,14 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         if (teleprompter != null) teleprompter.Hide();
 
         if (headLogger != null) headLogger.StopLogging();
-        if (speechAnalyzer != null) speechAnalyzer.StopAnalysis();
+        if (liveSpeechHud != null) liveSpeechHud.BeginFinalizing();
+        StartCoroutine(FinishSessionAfterSpeech(Time.time));
+    }
+
+    private IEnumerator FinishSessionAfterSpeech(float endedAt)
+    {
+        if (speechAnalyzer != null) yield return speechAnalyzer.StopAnalysisGracefully();
+        if (liveSpeechHud != null) liveSpeechHud.ShowFinal();
 
         // audience reacts based on performance
         if (audienceManager != null && headLogger != null)
@@ -233,7 +260,7 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
             audienceManager.OnSessionEnded(metrics.confidenceScore);
         }
 
-        feedbackController?.EndSession();
+        feedbackController?.EndSessionAt(endedAt);
         // Only run the old AI-generated scores when explicitly using legacy mode.
         // Hybrid Option C uses ScoreCalculator and OpenAI coaching in FeedbackController.
         if (feedbackController != null && !feedbackController.UseHybridOpenAiCoaching)

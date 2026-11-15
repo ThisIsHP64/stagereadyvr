@@ -131,3 +131,6 @@ InitTestScene*.unity*
 
 # local editor preferences
 /.vscode/
+
+# Live speech relay local development configuration
+/Assets/Resources/live_relay_config.json*
