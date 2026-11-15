@@ -33,6 +33,7 @@ namespace StageReadyVR.Presentation
         readonly IPdfPageSource source;
         readonly IRenderWorker worker;
         readonly int maxEdge;
+        readonly bool prefetchBehind;
         readonly ConcurrentQueue<Outcome> finished = new ConcurrentQueue<Outcome>();
         readonly HashSet<int> requested = new HashSet<int>();
         bool disposed;
@@ -43,8 +44,10 @@ namespace StageReadyVR.Presentation
         /// <summary>A wanted page could not be rendered, with a message that is safe to show the user.</summary>
         public event Action<int, string> PageFailed;
 
-        public SlideDeck(IPdfPageSource source, IRenderWorker worker, int maxEdge = DefaultMaxEdge)
+        /// <param name="prefetchBehind">Also keep the previous page ready, for viewers that can turn back.</param>
+        public SlideDeck(IPdfPageSource source, IRenderWorker worker, int maxEdge = DefaultMaxEdge, bool prefetchBehind = false)
         {
+            this.prefetchBehind = prefetchBehind;
             this.source = source ?? throw new ArgumentNullException(nameof(source));
             this.worker = worker ?? throw new ArgumentNullException(nameof(worker));
             if (maxEdge <= 0) throw new ArgumentOutOfRangeException(nameof(maxEdge));
@@ -71,10 +74,29 @@ namespace StageReadyVR.Presentation
             return true;
         }
 
-        /// <summary>Pages worth keeping in memory: the one shown and the one prefetched for the next press.</summary>
+        /// <summary>Moves one page back. Returns false on the first page, which stays shown.</summary>
+        public bool Retreat()
+        {
+            return GoTo(Current - 1);
+        }
+
+        /// <summary>Jumps to a page. Returns false when it is out of range or already shown.</summary>
+        public bool GoTo(int index)
+        {
+            if (disposed || index < 0 || index >= PageCount || index == Current) return false;
+            Current = index;
+            RequestWindow();
+            return true;
+        }
+
+        /// <summary>
+        /// Pages worth keeping in memory: the one shown, the one prefetched for the next
+        /// press, and the previous one when turning back is possible.
+        /// </summary>
         public bool IsWanted(int index)
         {
-            return index >= 0 && index < PageCount && (index == Current || index == Current + 1);
+            if (index < 0 || index >= PageCount) return false;
+            return index == Current || index == Current + 1 || (prefetchBehind && index == Current - 1);
         }
 
         /// <summary>Raises events for finished renders. Call once per frame on the main thread.</summary>
@@ -112,6 +134,7 @@ namespace StageReadyVR.Presentation
             requested.RemoveWhere(i => !IsWanted(i));
             Request(Current);
             Request(Current + 1);
+            if (prefetchBehind) Request(Current - 1);
         }
 
         void Request(int index)

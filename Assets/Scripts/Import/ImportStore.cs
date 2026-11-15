@@ -30,6 +30,12 @@ namespace StageReadyVR.Import
 
         // empty means no deck is projected; JsonUtility writes null strings as empty
         public string activePresentationId = string.Empty;
+
+        // empty means nothing is held during sessions; older indexes simply lack the field
+        public string activeNotesId = string.Empty;
+
+        // a ScriptDisplay value; zero keeps older indexes on held pages
+        public int scriptDisplay;
     }
 
     /// <summary>
@@ -62,9 +68,9 @@ namespace StageReadyVR.Import
 
         public string RootDirectory => root;
 
-        public SaveResult Save(byte[] data, string originalName)
+        public SaveResult Save(byte[] data, string originalName, ImportKind kind)
         {
-            ValidationResult check = ImportValidator.Validate(data, originalName);
+            ValidationResult check = ImportValidator.Validate(data, originalName, kind);
             if (!check.IsValid) return SaveResult.Fail(check.Message);
 
             lock (gate)
@@ -75,7 +81,7 @@ namespace StageReadyVR.Import
                     Directory.CreateDirectory(root);
 
                     string id = Guid.NewGuid().ToString("N");
-                    string storedName = id + (check.Kind == ImportKind.Script ? ".txt" : ".pdf");
+                    string storedName = id + (check.IsPdf ? ".pdf" : ".txt");
                     storedPath = Path.Combine(root, storedName);
                     WriteReplacing(storedPath, check.Data);
 
@@ -129,16 +135,16 @@ namespace StageReadyVR.Import
             return null;
         }
 
-        /// <summary>Reads a stored script. On failure, error holds a message that is safe to show the user.</summary>
+        /// <summary>Reads a stored text script or text index cards. On failure, error holds a message that is safe to show the user.</summary>
         public bool TryReadText(string id, out string text, out string error)
         {
             text = null;
             error = null;
 
             ImportedFile entry = Get(id);
-            if (entry == null || entry.kind != ImportKind.Script)
+            if (entry == null || !entry.IsNotes || entry.IsPdf)
             {
-                error = "That script could not be found. Import it again.";
+                error = "Those notes could not be found. Import them again.";
                 return false;
             }
 
@@ -148,13 +154,13 @@ namespace StageReadyVR.Import
                 lock (gate) bytes = File.ReadAllBytes(Path.Combine(root, entry.storedFileName));
 
                 if (ImportValidator.TryDecodeText(bytes, out text) && text.Trim().Length > 0) return true;
-                error = "That script is empty or damaged. Import it again.";
+                error = "Those notes are empty or damaged. Import them again.";
                 return false;
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
                 Debug.LogWarning("[ImportStore] read failed: " + e.Message);
-                error = "That script could not be read. Import it again.";
+                error = "Those notes could not be read. Import them again.";
                 return false;
             }
         }
@@ -164,6 +170,14 @@ namespace StageReadyVR.Import
         {
             ImportedFile entry = Get(id);
             if (entry == null || entry.kind != ImportKind.Presentation) return null;
+            return Path.Combine(root, entry.storedFileName);
+        }
+
+        /// <summary>Full path of any stored pdf, such as pdf index cards, or null if it is missing or text.</summary>
+        public string GetPdfPath(string id)
+        {
+            ImportedFile entry = Get(id);
+            if (entry == null || !entry.IsPdf) return null;
             return Path.Combine(root, entry.storedFileName);
         }
 
@@ -213,6 +227,82 @@ namespace StageReadyVR.Import
             return entry != null && entry.kind == ImportKind.Presentation ? entry : null;
         }
 
+        /// <summary>
+        /// Chooses the script or index cards held during sessions. Null or empty clears it.
+        /// Returns false when the id is not existing notes or the index cannot be written.
+        /// </summary>
+        public bool SetActiveNotes(string id)
+        {
+            lock (gate)
+            {
+                ImportIndex index = LoadIndex();
+                string next = string.Empty;
+
+                if (!string.IsNullOrEmpty(id))
+                {
+                    ImportedFile entry = index.files.Find(f => f.id == id);
+                    if (entry == null || !entry.IsNotes) return false;
+                    if (!File.Exists(Path.Combine(root, entry.storedFileName))) return false;
+                    next = id;
+                }
+
+                index.activeNotesId = next;
+                try
+                {
+                    Directory.CreateDirectory(root);
+                    WriteReplacing(IndexPath, System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(index)));
+                    return true;
+                }
+                catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("[ImportStore] selecting notes failed: " + e.Message);
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>The notes chosen for sessions, or null when none are chosen or the file is gone.</summary>
+        public ImportedFile GetActiveNotes()
+        {
+            string id;
+            lock (gate) id = LoadIndex().activeNotesId;
+            if (string.IsNullOrEmpty(id)) return null;
+
+            ImportedFile entry = Get(id);
+            return entry != null && entry.IsNotes ? entry : null;
+        }
+
+        /// <summary>How text scripts are shown. Unknown stored values read as held pages.</summary>
+        public ScriptDisplay GetScriptDisplay()
+        {
+            int raw;
+            lock (gate) raw = LoadIndex().scriptDisplay;
+            return Enum.IsDefined(typeof(ScriptDisplay), raw) ? (ScriptDisplay)raw : ScriptDisplay.Held;
+        }
+
+        /// <summary>Saves how text scripts are shown. Returns false when the index cannot be written.</summary>
+        public bool SetScriptDisplay(ScriptDisplay display)
+        {
+            if (!Enum.IsDefined(typeof(ScriptDisplay), display)) return false;
+
+            lock (gate)
+            {
+                ImportIndex index = LoadIndex();
+                index.scriptDisplay = (int)display;
+                try
+                {
+                    Directory.CreateDirectory(root);
+                    WriteReplacing(IndexPath, System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(index)));
+                    return true;
+                }
+                catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("[ImportStore] saving script display failed: " + e.Message);
+                    return false;
+                }
+            }
+        }
+
         public bool Delete(string id)
         {
             lock (gate)
@@ -224,6 +314,7 @@ namespace StageReadyVR.Import
                 string path = Path.Combine(root, index.files[at].storedFileName);
                 index.files.RemoveAt(at);
                 if (index.activePresentationId == id) index.activePresentationId = string.Empty;
+                if (index.activeNotesId == id) index.activeNotesId = string.Empty;
 
                 try
                 {
@@ -266,6 +357,12 @@ namespace StageReadyVR.Import
                 string active = loaded.activePresentationId;
                 if (!string.IsNullOrEmpty(active) && index.files.Exists(f => f.id == active))
                     index.activePresentationId = active;
+
+                index.scriptDisplay = loaded.scriptDisplay;
+
+                string notes = loaded.activeNotesId;
+                if (!string.IsNullOrEmpty(notes) && index.files.Exists(f => f.id == notes))
+                    index.activeNotesId = notes;
             }
             catch (Exception e)
             {

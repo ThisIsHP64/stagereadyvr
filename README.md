@@ -58,24 +58,57 @@ The headset needs an internet connection while a presentation is running. If the
 
 ## Importing files
 
-A speaker can send a `.txt` speech script or a `.pdf` exported from their presentation to the headset over Wi-Fi. This stores the files only. Showing them (teleprompter, slide rendering) is separate work.
+A speaker can send three kinds of file to the headset over Wi-Fi. The upload page asks which kind each file is; nothing is guessed from the name.
 
-The main menu has an **Import Files** button (below the three environments) that opens the import screen. It shows the address and PIN, lists the newest imports and has a Back button. The screen is built by `StageReadyVR > Build Import Screen` (`Assets/Editor/ImportScreenBuilder.cs`), which can be re-run safely.
+| Kind | Formats | Used for |
+| --- | --- | --- |
+| Presentation slides | `.pdf` | Projected on the screen behind the speaker. The right trigger or Page Down advances. |
+| Index cards | `.txt` or `.pdf` | Held at chest height, one card at a time. In a `.txt`, a line of `---` (or `===`) starts a new card; without such lines, each blank line does. `- ` and `* ` lines become bullets. |
+| Script | `.txt` or `.pdf` | Held at chest height as pages. Text is paginated to fit the page. |
+
+The main menu has an **Import Files** button (below the three environments) that opens the import screen. It shows the address and PIN, lists the newest imports with their kind, and has **Change Presentation**, **Change Notes** and **Back** buttons. Change Notes steps through none and each imported script or card set. The screen is built by `StageReadyVR > Build Import Screen` (`Assets/Editor/ImportScreenBuilder.cs`), which can be re-run safely.
+
+### Speaker notes: held cards, held script, teleprompter
+
+The notes chosen with **Change Notes** are shown in one of three ways during a session:
+
+| Notes | Script Style | Shown as |
+| --- | --- | --- |
+| Index cards (`.txt` or `.pdf`) | any | Held cards |
+| Script (`.txt`) | Held | Held pages |
+| Script (`.txt`) | Teleprompter | Scrolling teleprompter |
+| Script (`.pdf`) | any | Held pages (a PDF page is an image and cannot reflow, so it cannot scroll) |
+
+**Script Style** on the Import screen switches between Held and Teleprompter. The choice is remembered.
+
+**Held notes** (`Assets/Scripts/Notes/HeldNotes.cs`) float about 40 cm in front of the speaker and 35 cm below eye level, tilted toward the eyes. They follow the body, not the gaze: looking up at the audience or down at the notes never moves them, and they only swing around once the speaker turns more than about 35 degrees. PDF notes render with the same page renderer as the projector; in the editor they show as placeholder pages.
+
+**The teleprompter** (`Assets/Scripts/Notes/Teleprompter.cs`, based on Lucas Deutsch's prototype) is placed once when the session starts, at eye level 1.8 m ahead, facing the speaker. It stays there, so reading it means looking out at the room. The script scrolls past a reading band at a set pace in words per minute (140 by default, 60 to 220), and the last speed is remembered.
+
+Controls, all on the left controller, only while the session is running and not paused:
+
+| Input | Held notes | Teleprompter | Desktop keys |
+| --- | --- | --- | --- |
+| Flick stick right / left | Next / previous page | Jump 3 lines forward / back | `.` / `,` |
+| Flick stick up / down | | 10 wpm faster / slower | Up / Down |
+| Click stick | | Pause / resume | Space |
+
+The notes hide when the feedback dashboard appears. They are added to the three session scenes by `StageReadyVR > Add Speaker Notes To Session Scenes` (`Assets/Editor/SpeakerNotesBuilder.cs`), which can be re-run safely.
 
 How it works:
 
 1. A screen with an `ImportController` (`Assets/Scripts/Import/`) calls `BeginImport()` and shows `Url` and `Pin` to the user.
-2. On a laptop or phone on the same Wi-Fi, the user opens the URL, types the PIN, picks a file and uploads it.
+2. On a laptop or phone on the same Wi-Fi, the user opens the URL, types the PIN, chooses the kind, picks a file and uploads it.
 3. The file is validated and saved under `Application.persistentDataPath/Imports/`. The controller raises `Imported` or `Failed` with a message that is safe to show.
 4. `EndImport()` stops the server. It also stops on disable and when the headset sleeps.
 
-Reading the files back goes through `ImportStore` (`List`, `TryReadText`, `GetPresentationPath`, `Delete`).
+Reading the files back goes through `ImportStore` (`List`, `TryReadText`, `GetPresentationPath`, `GetPdfPath`, `GetActivePresentation`, `GetActiveNotes`, `Delete`).
 
-Limits: `.txt` must be UTF-8 and non empty, up to 1 MB. `.pdf` must be a real PDF, up to 25 MB. Anything else is refused with a clear message.
+Limits: `.txt` must be UTF-8 and non empty, up to 1 MB. `.pdf` must be a real PDF, up to 25 MB. A presentation must be a `.pdf`. Anything else is refused with a clear message.
 
 Security notes: the server only listens while an import screen is open, every upload needs the per-session PIN (5 wrong tries lock it), and requests with an unexpected `Host` or `Origin` are rejected. Files are stored under generated names, never the uploaded name. The transfer is plain HTTP on the local network, so the PIN and file are not encrypted in transit. Use it on a network you trust.
 
-Run the unit tests (validator, store and a loopback server) with:
+Run the unit tests (validator, store, a loopback server, the projector and the held notes) with:
 
 ```
 Unity -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults Builds/test-results.xml

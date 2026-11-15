@@ -34,7 +34,8 @@ namespace StageReadyVR.Import.Tests
 
         static ImportedFile File(string name, ImportKind kind, long size)
         {
-            return new ImportedFile { id = name, displayName = name, kind = kind, sizeBytes = size };
+            // stored names keep the uploaded extension, which is how the list tells txt from pdf
+            return new ImportedFile { id = name, displayName = name, kind = kind, sizeBytes = size, storedFileName = name };
         }
 
         [Test]
@@ -69,7 +70,7 @@ namespace StageReadyVR.Import.Tests
                 File("deck.pdf", ImportKind.Presentation, 2 * 1024 * 1024),
                 File("talk.txt", ImportKind.Script, 300)
             };
-            Assert.AreEqual("deck.pdf (pdf, 2.0 MB)\ntalk.txt (txt, 300 B)", ImportScreen.FormatList(list, 5));
+            Assert.AreEqual("deck.pdf (slides, pdf, 2.0 MB)\ntalk.txt (script, txt, 300 B)", ImportScreen.FormatList(list, 5));
         }
 
         [Test]
@@ -128,6 +129,60 @@ namespace StageReadyVR.Import.Tests
         {
             Assert.AreEqual("Presentation: none", ImportScreen.FormatPresentation(null));
             Assert.AreEqual("Presentation: deck.pdf", ImportScreen.FormatPresentation(File("deck.pdf", ImportKind.Presentation, 1)));
+        }
+    
+        [Test]
+        public void ListNamesIndexCardsAndPdfScripts()
+        {
+            var list = new List<ImportedFile>
+            {
+                File("cards.txt", ImportKind.IndexCards, 2048),
+                File("speech.pdf", ImportKind.Script, 10)
+            };
+            Assert.AreEqual("cards.txt (cards, txt, 2 KB)\nspeech.pdf (script, pdf, 10 B)", ImportScreen.FormatList(list, 5));
+        }
+
+        [Test]
+        public void NotesCycleGoesNoneThenEachScriptOrCardSetThenNone()
+        {
+            var list = new List<ImportedFile>
+            {
+                File("cards.txt", ImportKind.IndexCards, 1),
+                File("deck.pdf", ImportKind.Presentation, 1),
+                File("talk.pdf", ImportKind.Script, 1)
+            };
+            Assert.AreEqual("cards.txt", ImportScreen.NextNotesId(list, null));
+            Assert.AreEqual("talk.pdf", ImportScreen.NextNotesId(list, "cards.txt"));
+            Assert.IsNull(ImportScreen.NextNotesId(list, "talk.pdf"));
+            Assert.AreEqual("cards.txt", ImportScreen.NextNotesId(list, "deleted"));
+        }
+
+        [Test]
+        public void NotesCycleWithOnlyDecksStaysNone()
+        {
+            var list = new List<ImportedFile> { File("deck.pdf", ImportKind.Presentation, 1) };
+            Assert.IsNull(ImportScreen.NextNotesId(list, null));
+            Assert.IsNull(ImportScreen.NextNotesId(null, null));
+        }
+
+        [Test]
+        public void NotesLabelNamesTheNotesAndTheirKind()
+        {
+            Assert.AreEqual("Notes: none", ImportScreen.FormatNotes(null));
+            Assert.AreEqual("Notes: cards.txt (cards)", ImportScreen.FormatNotes(File("cards.txt", ImportKind.IndexCards, 1)));
+        }
+
+        [Test]
+        public void NotesLabelShowsTheScriptStyle()
+        {
+            ImportedFile text = File("talk.txt", ImportKind.Script, 1);
+            ImportedFile pdf = File("talk.pdf", ImportKind.Script, 1);
+            ImportedFile cards = File("cards.txt", ImportKind.IndexCards, 1);
+
+            Assert.AreEqual("Notes: talk.txt (script, held)", ImportScreen.FormatNotes(text, ScriptDisplay.Held));
+            Assert.AreEqual("Notes: talk.txt (script, teleprompter)", ImportScreen.FormatNotes(text, ScriptDisplay.Teleprompter));
+            Assert.AreEqual("Notes: talk.pdf (script, held: pdf scripts cannot scroll)", ImportScreen.FormatNotes(pdf, ScriptDisplay.Teleprompter));
+            Assert.AreEqual("Notes: cards.txt (cards)", ImportScreen.FormatNotes(cards, ScriptDisplay.Teleprompter));
         }
     }
 }

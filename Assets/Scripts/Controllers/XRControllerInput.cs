@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
 using ISButton = UnityEngine.InputSystem.Controls.ButtonControl;
+using ISStick = UnityEngine.InputSystem.Controls.Vector2Control;
 using ISController = UnityEngine.InputSystem.XR.XRController;
 using ISDevice = UnityEngine.InputSystem.InputDevice;
 
@@ -20,7 +21,8 @@ namespace StageReadyVR.Controllers
         RightPrimary,     // A
         RightSecondary,   // B
         AnyPrimary,       // A or X
-        RightTrigger      // appended last so stored enum values keep their meaning
+        RightTrigger,     // appended last so stored enum values keep their meaning
+        LeftStickClick
     }
 
     /// <summary>
@@ -56,6 +58,8 @@ namespace StageReadyVR.Controllers
         private static ISButton _isRightPrimary;
         private static ISButton _isRightSecondary;
         private static ISButton _isRightTrigger;
+        private static ISButton _isLeftStickClick;
+        private static ISStick _isLeftStick;
         private static int _nextResolveFrame;
 
         /// <summary>True only on the first frame the button is pressed.</summary>
@@ -70,6 +74,25 @@ namespace StageReadyVR.Controllers
         {
             Refresh();
             return Held[(int)button];
+        }
+
+        /// <summary>
+        /// The left thumbstick, each axis from -1 to 1. Both input routes are read and the
+        /// stronger one wins, so the stick works whichever route the runtime fills in.
+        /// </summary>
+        public static Vector2 GetLeftStick()
+        {
+            Refresh();
+
+            Vector2 legacy = Vector2.zero;
+            if (EnsureDevice(ref _left, LeftHand))
+                _left.TryGetFeatureValue(CommonUsages.primary2DAxis, out legacy);
+
+            Vector2 inputSystem = _isLeftStick != null && _isLeftStick.device != null && _isLeftStick.device.added
+                ? _isLeftStick.ReadValue()
+                : Vector2.zero;
+
+            return legacy.sqrMagnitude >= inputSystem.sqrMagnitude ? legacy : inputSystem;
         }
 
         // samples every button once per frame so repeated queries agree
@@ -112,6 +135,9 @@ namespace StageReadyVR.Controllers
                 case ControllerButton.RightTrigger:
                     return ReadLegacy(ref _right, RightHand, CommonUsages.triggerButton)
                         || IsPressed(_isRightTrigger);
+                case ControllerButton.LeftStickClick:
+                    return ReadLegacy(ref _left, LeftHand, CommonUsages.primary2DAxisClick)
+                        || IsPressed(_isLeftStickClick);
                 case ControllerButton.AnyPrimary:
                     return ReadLegacy(ref _left, LeftHand, CommonUsages.primaryButton)
                         || ReadLegacy(ref _right, RightHand, CommonUsages.primaryButton)
@@ -125,15 +151,19 @@ namespace StageReadyVR.Controllers
         private static bool ReadLegacy(ref UnityEngine.XR.InputDevice device, InputDeviceCharacteristics hand,
                                        InputFeatureUsage<bool> usage)
         {
-            // controllers can connect or drop at any time, so re-acquire when invalid
-            if (!device.isValid)
-            {
-                Scratch.Clear();
-                InputDevices.GetDevicesWithCharacteristics(hand, Scratch);
-                if (Scratch.Count == 0) return false;
-                device = Scratch[0];
-            }
+            if (!EnsureDevice(ref device, hand)) return false;
             return device.TryGetFeatureValue(usage, out bool value) && value;
+        }
+
+        // controllers can connect or drop at any time, so re-acquire when invalid
+        private static bool EnsureDevice(ref UnityEngine.XR.InputDevice device, InputDeviceCharacteristics hand)
+        {
+            if (device.isValid) return true;
+            Scratch.Clear();
+            InputDevices.GetDevicesWithCharacteristics(hand, Scratch);
+            if (Scratch.Count == 0) return false;
+            device = Scratch[0];
+            return true;
         }
 
         private static bool IsPressed(ISButton control)
@@ -152,10 +182,13 @@ namespace StageReadyVR.Controllers
             _isRightPrimary = FindControl("RightHand", "primaryButton", "A");
             _isRightSecondary = FindControl("RightHand", "secondaryButton", "B");
             _isRightTrigger = FindControl("RightHand", "triggerPressed", "triggerButton");
+            _isLeftStick = FindStick("LeftHand", "thumbstick", "primary2DAxis");
+            _isLeftStickClick = FindControl("LeftHand", "thumbstickClicked", "primary2DAxisClick");
 
             bool allFound = _isLeftMenu != null && _isLeftPrimary != null
                          && _isRightPrimary != null && _isRightSecondary != null
-                         && _isRightTrigger != null;
+                         && _isRightTrigger != null && _isLeftStick != null
+                         && _isLeftStickClick != null;
             _nextResolveFrame = frame + (allFound ? ResolveSettledFrames : ResolveRetryFrames);
         }
 
@@ -169,6 +202,20 @@ namespace StageReadyVR.Controllers
 
                 if (device.TryGetChildControl(name) is ISButton byName) return byName;
                 if (device.TryGetChildControl(alias) is ISButton byAlias) return byAlias;
+            }
+            return null;
+        }
+
+        private static ISStick FindStick(string handUsage, string name, string alias)
+        {
+            var devices = UnityEngine.InputSystem.InputSystem.devices;
+            for (int i = 0; i < devices.Count; i++)
+            {
+                ISDevice device = devices[i];
+                if (!(device is ISController) || !HasUsage(device, handUsage)) continue;
+
+                if (device.TryGetChildControl(name) is ISStick byName) return byName;
+                if (device.TryGetChildControl(alias) is ISStick byAlias) return byAlias;
             }
             return null;
         }

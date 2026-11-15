@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using StageReadyVR.Controllers;
 using StageReadyVR.Feedback;
+using StageReadyVR.Notes;
 using StageReadyVR.Presentation;
 
 /// <summary>
@@ -52,6 +53,10 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
     [Header("Presentation")]
     [Tooltip("Optional projector screen; placed behind the player when the session starts")]
     public ProjectionScreen projectionScreen;
+    [Tooltip("Optional index cards or script held at chest height during the session")]
+    public HeldNotes heldNotes;
+    [Tooltip("Optional scrolling script placed at eye level toward the audience")]
+    public Teleprompter teleprompter;
 
     public string environmentName = "Conference Room";
 
@@ -131,6 +136,10 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         // placed now rather than at scene load because the head pose is only reliable once tracking settles
         if (projectionScreen != null && centerEyeAnchor != null)
             projectionScreen.Place(centerEyeAnchor);
+        if (heldNotes != null && centerEyeAnchor != null)
+            heldNotes.Begin(centerEyeAnchor);
+        if (teleprompter != null && centerEyeAnchor != null)
+            teleprompter.Begin(centerEyeAnchor);
 
         Debug.Log("[SessionManager] about to BeginSession, feedbackController null? " + (feedbackController == null));
         feedbackController?.BeginSession(environmentName, audienceManager != null ? audienceManager.audienceMode.ToString() : "",
@@ -209,6 +218,10 @@ public class SessionManager : MonoBehaviour, IDistractorMetricsSource
         sessionEnded = true;
 
         if (sessionHUD != null) sessionHUD.SetActive(false);
+
+        // notes would otherwise sit in front of the feedback dashboard
+        if (heldNotes != null) heldNotes.Hide();
+        if (teleprompter != null) teleprompter.Hide();
 
         if (headLogger != null) headLogger.StopLogging();
         if (speechAnalyzer != null) speechAnalyzer.StopAnalysis();

@@ -43,11 +43,11 @@ namespace StageReadyVR.Import.Tests
         List<int> shown;
         List<string> failures;
 
-        void Make(int pages)
+        void Make(int pages, bool prefetchBehind = false)
         {
             source = new FakeSource(pages);
             worker = new ImmediateWorker();
-            deck = new SlideDeck(source, worker, 64);
+            deck = new SlideDeck(source, worker, 64, prefetchBehind);
             shown = new List<int>();
             failures = new List<string>();
             deck.PageRendered += (i, _) => shown.Add(i);
@@ -72,6 +72,47 @@ namespace StageReadyVR.Import.Tests
             Assert.IsTrue(deck.Advance());
             Assert.AreEqual(1, deck.Current);
             CollectionAssert.AreEqual(new[] { 0, 1, 2 }, source.Rendered);
+        }
+
+        [Test]
+        public void RetreatAndGoToMoveWithinRange()
+        {
+            Make(4);
+            deck.Begin();
+            Assert.IsFalse(deck.Retreat(), "already on the first page");
+            Assert.IsTrue(deck.GoTo(3));
+            Assert.AreEqual(3, deck.Current);
+            Assert.IsTrue(deck.Retreat());
+            Assert.AreEqual(2, deck.Current);
+            Assert.IsFalse(deck.GoTo(2), "already shown");
+            Assert.IsFalse(deck.GoTo(4));
+            Assert.IsFalse(deck.GoTo(-1));
+        }
+
+        [Test]
+        public void ProjectorWindowDoesNotKeepThePreviousPage()
+        {
+            Make(4);
+            deck.Begin();
+            deck.Advance();
+            Assert.IsFalse(deck.IsWanted(0));
+        }
+
+        [Test]
+        public void PrefetchBehindKeepsBothNeighboursReady()
+        {
+            Make(5, prefetchBehind: true);
+            deck.Begin();
+            Assert.IsTrue(deck.GoTo(2));
+            Assert.IsTrue(deck.IsWanted(1));
+            Assert.IsTrue(deck.IsWanted(3));
+            Assert.IsFalse(deck.IsWanted(0));
+            CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3 }, source.Rendered);
+
+            // turning back needs nothing new rendered except the page before the new one
+            source.Rendered.Clear();
+            Assert.IsTrue(deck.Retreat());
+            CollectionAssert.AreEqual(new[] { 0 }, source.Rendered);
         }
 
         [Test]

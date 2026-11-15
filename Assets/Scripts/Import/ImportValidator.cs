@@ -11,15 +11,16 @@ namespace StageReadyVR.Import
         public ImportKind Kind { get; private set; }
         public string DisplayName { get; private set; }
         public byte[] Data { get; private set; }
+        public bool IsPdf { get; private set; }
 
         public static ValidationResult Fail(string message)
         {
             return new ValidationResult { IsValid = false, Message = message };
         }
 
-        public static ValidationResult Ok(ImportKind kind, string displayName, byte[] data)
+        public static ValidationResult Ok(ImportKind kind, string displayName, byte[] data, bool isPdf)
         {
-            return new ValidationResult { IsValid = true, Kind = kind, DisplayName = displayName, Data = data };
+            return new ValidationResult { IsValid = true, Kind = kind, DisplayName = displayName, Data = data, IsPdf = isPdf };
         }
     }
 
@@ -41,9 +42,10 @@ namespace StageReadyVR.Import
         // strict decoding so malformed bytes throw instead of becoming U+FFFD
         static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
-        public static int MaxBytesFor(ImportKind kind)
+        /// <summary>Upload size limit for a file format, independent of what the file is used for.</summary>
+        public static int MaxBytesFor(bool isPdf)
         {
-            return kind == ImportKind.Script ? MaxScriptBytes : MaxPresentationBytes;
+            return isPdf ? MaxPresentationBytes : MaxScriptBytes;
         }
 
         /// <summary>
@@ -73,34 +75,60 @@ namespace StageReadyVR.Import
             return name.Substring(0, MaxDisplayNameLength - ext.Length) + ext;
         }
 
-        public static bool TryGetKind(string fileName, out ImportKind kind)
+        /// <summary>Accepts only .txt and .pdf names; isPdf tells which one it is.</summary>
+        public static bool TryGetFormat(string fileName, out bool isPdf)
         {
-            kind = ImportKind.Script;
             string ext = Path.GetExtension(SanitizeName(fileName)).ToLowerInvariant();
-            if (ext == ".txt") { kind = ImportKind.Script; return true; }
-            if (ext == ".pdf") { kind = ImportKind.Presentation; return true; }
-            return false;
+            isPdf = ext == ".pdf";
+            return isPdf || ext == ".txt";
         }
 
-        public static ValidationResult Validate(byte[] data, string originalName)
+        /// <summary>Parses the kind the user picked on the upload page.</summary>
+        public static bool TryParseKind(string raw, out ImportKind kind)
+        {
+            switch ((raw ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "presentation": kind = ImportKind.Presentation; return true;
+                case "cards": kind = ImportKind.IndexCards; return true;
+                case "script": kind = ImportKind.Script; return true;
+                default: kind = ImportKind.Script; return false;
+            }
+        }
+
+        /// <summary>Checks that a file format can be used as the chosen kind. On failure, message is safe to show.</summary>
+        public static bool IsFormatAllowed(ImportKind kind, bool isPdf, out string message)
+        {
+            message = null;
+            if (kind == ImportKind.Presentation && !isPdf)
+            {
+                message = "Presentations must be a PDF export of your slides.";
+                return false;
+            }
+            return true;
+        }
+
+        public static ValidationResult Validate(byte[] data, string originalName, ImportKind kind)
         {
             string displayName = SanitizeName(originalName);
             if (displayName.Length == 0)
                 return ValidationResult.Fail("The file has no usable name.");
 
-            if (!TryGetKind(displayName, out ImportKind kind))
+            if (!TryGetFormat(displayName, out bool isPdf))
                 return ValidationResult.Fail("Only .txt and .pdf files can be imported.");
+
+            if (!IsFormatAllowed(kind, isPdf, out string formatMessage))
+                return ValidationResult.Fail(formatMessage);
 
             if (data == null || data.Length == 0)
                 return ValidationResult.Fail("The file is empty.");
 
-            int limit = MaxBytesFor(kind);
+            int limit = MaxBytesFor(isPdf);
             if (data.Length > limit)
                 return ValidationResult.Fail("The file is too large. The limit is " + (limit / (1024 * 1024)) + " MB for this file type.");
 
-            return kind == ImportKind.Script
-                ? ValidateScript(data, displayName)
-                : ValidatePresentation(data, displayName);
+            return isPdf
+                ? ValidatePdf(data, displayName, kind)
+                : ValidateText(data, displayName, kind);
         }
 
         /// <summary>Decodes stored script bytes, or returns false when they are not valid text.</summary>
@@ -118,7 +146,7 @@ namespace StageReadyVR.Import
             }
         }
 
-        static ValidationResult ValidateScript(byte[] data, string displayName)
+        static ValidationResult ValidateText(byte[] data, string displayName, ImportKind kind)
         {
             // drop the utf-8 byte order mark so stored text starts with real content
             byte[] body = data;
@@ -138,18 +166,18 @@ namespace StageReadyVR.Import
             if (text.Trim().Length == 0)
                 return ValidationResult.Fail("The text file is empty.");
 
-            return ValidationResult.Ok(ImportKind.Script, displayName, body);
+            return ValidationResult.Ok(kind, displayName, body, false);
         }
 
-        static ValidationResult ValidatePresentation(byte[] data, string displayName)
+        static ValidationResult ValidatePdf(byte[] data, string displayName, ImportKind kind)
         {
             int headLength = Math.Min(data.Length, PdfHeaderWindow);
             int tailStart = Math.Max(0, data.Length - PdfTrailerWindow);
 
             if (IndexOf(data, PdfHeader, 0, headLength) < 0 || IndexOf(data, PdfTrailer, tailStart, data.Length - tailStart) < 0)
-                return ValidationResult.Fail("This does not look like a valid PDF. Export the presentation as PDF and try again.");
+                return ValidationResult.Fail("This does not look like a valid PDF. Export it as PDF again and retry.");
 
-            return ValidationResult.Ok(ImportKind.Presentation, displayName, data);
+            return ValidationResult.Ok(kind, displayName, data, true);
         }
 
         static int IndexOf(byte[] haystack, byte[] needle, int start, int count)

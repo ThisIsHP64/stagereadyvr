@@ -194,10 +194,21 @@ namespace StageReadyVR.Import
                     return;
             }
 
+            if (!ImportValidator.TryParseKind(request.QueryString["kind"], out ImportKind kind))
+            {
+                Fail(context, 400, "Choose whether this is a presentation, index cards or a script.");
+                return;
+            }
+
             string name = request.QueryString["name"];
-            if (!ImportValidator.TryGetKind(name, out ImportKind kind))
+            if (!ImportValidator.TryGetFormat(name, out bool isPdf))
             {
                 Fail(context, 415, "Only .txt and .pdf files can be imported.");
+                return;
+            }
+            if (!ImportValidator.IsFormatAllowed(kind, isPdf, out string formatMessage))
+            {
+                Fail(context, 415, formatMessage);
                 return;
             }
 
@@ -212,10 +223,10 @@ namespace StageReadyVR.Import
                 Fail(context, 400, "The file is empty.");
                 return;
             }
-            if (length > ImportValidator.MaxBytesFor(kind))
+            if (length > ImportValidator.MaxBytesFor(isPdf))
             {
                 Fail(context, 413, "The file is too large. The limit is " +
-                    (ImportValidator.MaxBytesFor(kind) / (1024 * 1024)) + " MB for this file type.");
+                    (ImportValidator.MaxBytesFor(isPdf) / (1024 * 1024)) + " MB for this file type.");
                 return;
             }
 
@@ -234,7 +245,7 @@ namespace StageReadyVR.Import
                     return;
                 }
 
-                SaveResult saved = store.Save(body, name);
+                SaveResult saved = store.Save(body, name, kind);
                 if (!saved.Success)
                 {
                     Fail(context, 422, saved.Message);

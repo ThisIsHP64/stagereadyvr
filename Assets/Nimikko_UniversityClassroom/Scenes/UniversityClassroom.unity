@@ -47410,6 +47410,105 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 1958490005}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1960352301
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1960352305}
+  - component: {fileID: 1960352304}
+  - component: {fileID: 1960352303}
+  - component: {fileID: 1960352302}
+  m_Layer: 0
+  m_Name: SpeakerNotes
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1960352302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1960352301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9072c67a897ff7bd09ab6da56d06e0e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heldNotes: {fileID: 1960352304}
+  teleprompter: {fileID: 1960352303}
+  sessionManager: {fileID: 2022760333}
+  pauseManager: {fileID: 1478087869}
+--- !u!114 &1960352303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1960352301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c94a58e2bbafe673a0e926851b13a8b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  distance: 1.8
+  verticalOffset: -0.05
+  panelSize: {x: 1.1, y: 0.55}
+  fontSize: 32
+  nudgeLines: 3
+  speedStep: 10
+  panelColor: {r: 0.04, g: 0.05, b: 0.08, a: 0.94}
+  textColor: {r: 0.96, g: 0.97, b: 1, a: 1}
+  bandColor: {r: 1, g: 1, b: 1, a: 0.08}
+  statusColor: {r: 0.62, g: 0.67, b: 0.78, a: 1}
+--- !u!114 &1960352304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1960352301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e83bd65bfe7a31612a5ba5bd28fae150, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  placement:
+    forward: 0.4
+    drop: 0.35
+    yawDeadZone: 35
+    yawFollowSeconds: 0.4
+    positionFollowSeconds: 0.15
+  cardSize: {x: 0.2, y: 0.13}
+  pageSize: {x: 0.18, y: 0.24}
+  cardFontSize: 9
+  cardMinFontSize: 5
+  scriptFontSize: 6.5
+  flipSeconds: 0.18
+  paperColor: {r: 0.98, g: 0.97, b: 0.93, a: 1}
+  inkColor: {r: 0.1, g: 0.11, b: 0.14, a: 1}
+  footerColor: {r: 0.42, g: 0.44, b: 0.5, a: 1}
+--- !u!4 &1960352305
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1960352301}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1962111213
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -48939,6 +49038,8 @@ MonoBehaviour:
   countdownStartDelay: 1.5
   audienceManager: {fileID: 228185691}
   projectionScreen: {fileID: 2043182069}
+  heldNotes: {fileID: 1960352304}
+  teleprompter: {fileID: 1960352303}
   environmentName: UniversityClassroom
 --- !u!4 &2022760334
 Transform:
@@ -53207,3 +53308,4 @@ SceneRoots:
   - {fileID: 1899517137}
   - {fileID: 243361957}
   - {fileID: 2043182070}
+  - {fileID: 1960352305}

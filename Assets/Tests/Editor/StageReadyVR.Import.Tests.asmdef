@@ -6,6 +6,7 @@
         "UnityEditor.TestRunner",
         "StageReadyVR.Import",
         "StageReadyVR.Presentation",
+        "StageReadyVR.Notes",
         "UnityEngine.UI",
         "Unity.TextMeshPro"
     ],

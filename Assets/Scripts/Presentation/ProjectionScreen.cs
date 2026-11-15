@@ -149,20 +149,7 @@ namespace StageReadyVR.Presentation
 
         IPdfPageSource OpenSource(string path, out string error, out IRenderWorker worker)
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            previewOnly = false;
-            AndroidPdfPageSource android = AndroidPdfPageSource.Open(path, out error);
-            worker = android != null
-                ? new ThreadRenderWorker(AndroidPdfPageSource.AttachThread, AndroidPdfPageSource.DetachThread)
-                : null;
-            return android;
-#else
-            // the editor has no pdf renderer, so stand-in pages let the flow be tested on a desktop
-            previewOnly = true;
-            error = null;
-            worker = new ThreadRenderWorker();
-            return PlaceholderPageSource.ForFile(path);
-#endif
+            return PdfSources.Open(path, out error, out worker, out previewOnly);
         }
 
         void OnPageRendered(int index, PageImage image)

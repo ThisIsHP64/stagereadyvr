@@ -44,9 +44,14 @@ namespace StageReadyVR.Import.Tests
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
 
-        HttpResponseMessage Upload(string name, byte[] body, string pin = null, Action<HttpRequestMessage> tweak = null)
+        HttpResponseMessage Upload(string name, byte[] body, string pin = null, Action<HttpRequestMessage> tweak = null, string kind = null)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, baseUrl + "/upload?name=" + Uri.EscapeDataString(name))
+            // most tests only care about the file, so the kind follows the old extension rule unless given
+            kind = kind ?? (name.EndsWith(".pdf") ? "presentation" : "script");
+            string url = baseUrl + "/upload?name=" + Uri.EscapeDataString(name);
+            if (kind.Length > 0) url += "&kind=" + Uri.EscapeDataString(kind);
+
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new ByteArrayContent(body)
             };
@@ -96,6 +101,43 @@ namespace StageReadyVR.Import.Tests
             HttpResponseMessage r = Upload("deck.pdf", ImportValidatorTests.MinimalPdf());
             Assert.AreEqual(HttpStatusCode.OK, r.StatusCode);
             Assert.AreEqual(ImportKind.Presentation, store.List()[0].kind);
+        }
+
+        [Test]
+        public void IndexCardsUploadIsStoredAsCards()
+        {
+            HttpResponseMessage r = Upload("cards.txt", Text("Hook\n\nPoint one"), kind: "cards");
+            Assert.AreEqual(HttpStatusCode.OK, r.StatusCode);
+            Assert.AreEqual(ImportKind.IndexCards, store.List()[0].kind);
+        }
+
+        [Test]
+        public void PdfScriptIsStoredAsScript()
+        {
+            HttpResponseMessage r = Upload("speech.pdf", ImportValidatorTests.MinimalPdf(), kind: "script");
+            Assert.AreEqual(HttpStatusCode.OK, r.StatusCode);
+            Assert.AreEqual(ImportKind.Script, store.List()[0].kind);
+            Assert.IsTrue(store.List()[0].IsPdf);
+        }
+
+        [TestCase("")]
+        [TestCase("slides")]
+        public void MissingOrUnknownKindIsRejected(string kind)
+        {
+            HttpResponseMessage r = Upload("speech.txt", Text("Hello."), kind: kind);
+            string body = r.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual(HttpStatusCode.BadRequest, r.StatusCode);
+            StringAssert.Contains("index cards", body);
+            Assert.AreEqual(0, store.List().Count);
+        }
+
+        [Test]
+        public void TextPresentationIsRejected()
+        {
+            HttpResponseMessage r = Upload("deck.txt", Text("slide"), kind: "presentation");
+            Assert.AreEqual(HttpStatusCode.UnsupportedMediaType, r.StatusCode);
+            Assert.AreEqual(0, store.List().Count);
         }
 
         [Test]

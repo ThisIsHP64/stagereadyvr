@@ -27,6 +27,8 @@ namespace StageReadyVR.Import
         [SerializeField] TMP_Text filesText;
         [Tooltip("Shows which imported pdf is projected during sessions")]
         [SerializeField] TMP_Text presentationText;
+        [Tooltip("Shows which script or index cards are held during sessions")]
+        [SerializeField] TMP_Text notesText;
 
         /// <summary>Steps the projected deck through none and each imported pdf, for a menu button.</summary>
         public void CyclePresentation()
@@ -61,6 +63,77 @@ namespace StageReadyVR.Import
             // an unknown current id behaves like none so the cycle restarts at the first deck
             int at = string.IsNullOrEmpty(currentId) ? -1 : decks.IndexOf(currentId);
             return at + 1 < decks.Count ? decks[at + 1] : null;
+        }
+
+        /// <summary>Steps the held notes through none and each imported script or card set, for a menu button.</summary>
+        public void CycleNotes()
+        {
+            if (controller == null) return;
+
+            ImportStore store = controller.Store;
+            ImportedFile current = store.GetActiveNotes();
+            string next = NextNotesId(store.List(), current != null ? current.id : null);
+
+            if (!store.SetActiveNotes(next))
+                SetText(statusText, "The notes choice could not be saved. Try again.");
+            Refresh();
+        }
+
+        /// <summary>
+        /// The id after currentId in the order none, then each script or card set as listed,
+        /// then none again. Presentations are skipped. Null means none.
+        /// </summary>
+        public static string NextNotesId(IReadOnlyList<ImportedFile> files, string currentId)
+        {
+            var notes = new List<string>();
+            if (files != null)
+            {
+                foreach (ImportedFile f in files)
+                {
+                    if (f != null && f.IsNotes) notes.Add(f.id);
+                }
+            }
+            if (notes.Count == 0) return null;
+
+            int at = string.IsNullOrEmpty(currentId) ? -1 : notes.IndexOf(currentId);
+            return at + 1 < notes.Count ? notes[at + 1] : null;
+        }
+
+        /// <summary>Switches text scripts between held pages and the teleprompter, for a menu button.</summary>
+        public void CycleScriptDisplay()
+        {
+            if (controller == null) return;
+
+            ImportStore store = controller.Store;
+            ScriptDisplay next = store.GetScriptDisplay() == ScriptDisplay.Held ? ScriptDisplay.Teleprompter : ScriptDisplay.Held;
+            if (!store.SetScriptDisplay(next))
+                SetText(statusText, "The script style could not be saved. Try again.");
+            Refresh();
+        }
+
+        public static string FormatNotes(ImportedFile active, ScriptDisplay display = ScriptDisplay.Held)
+        {
+            if (active == null) return "Notes: none";
+
+            string detail = KindLabel(active.kind);
+            if (active.kind == ImportKind.Script)
+            {
+                // a pdf page is an image, so it cannot reflow into a scrolling teleprompter
+                if (display == ScriptDisplay.Teleprompter && active.IsPdf) detail += ", held: pdf scripts cannot scroll";
+                else detail += display == ScriptDisplay.Teleprompter ? ", teleprompter" : ", held";
+            }
+            return "Notes: " + active.displayName + " (" + detail + ")";
+        }
+
+        /// <summary>Short user facing name for a kind, used in lists and labels.</summary>
+        public static string KindLabel(ImportKind kind)
+        {
+            switch (kind)
+            {
+                case ImportKind.Presentation: return "slides";
+                case ImportKind.IndexCards: return "cards";
+                default: return "script";
+            }
         }
 
         public static string FormatPresentation(ImportedFile active)
@@ -125,6 +198,9 @@ namespace StageReadyVR.Import
             SetText(pinText, running ? "PIN " + controller.Pin : string.Empty);
             SetText(filesText, controller != null ? FormatList(controller.Store.List(), MaxListed) : string.Empty);
             SetText(presentationText, controller != null ? FormatPresentation(controller.Store.GetActivePresentation()) : string.Empty);
+            SetText(notesText, controller != null
+                ? FormatNotes(controller.Store.GetActiveNotes(), controller.Store.GetScriptDisplay())
+                : string.Empty);
         }
 
         /// <summary>Lists imports as one line each, newest first, with a note when more exist.</summary>
@@ -139,7 +215,8 @@ namespace StageReadyVR.Import
                 if (i > 0) sb.Append('\n');
                 ImportedFile f = files[i];
                 sb.Append(f.displayName).Append(" (")
-                  .Append(f.kind == ImportKind.Script ? "txt" : "pdf").Append(", ")
+                  .Append(KindLabel(f.kind)).Append(", ")
+                  .Append(f.IsPdf ? "pdf" : "txt").Append(", ")
                   .Append(FormatSize(f.sizeBytes)).Append(')');
             }
             if (files.Count > shown) sb.Append("\n+").Append(files.Count - shown).Append(" more");

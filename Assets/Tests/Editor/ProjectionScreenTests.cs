@@ -176,7 +176,7 @@ namespace StageReadyVR.Import.Tests
         [Test]
         public void NoChosenDeckMeansNoScreen()
         {
-            store.Save(Pdf(3), "deck.pdf");
+            store.Save(Pdf(3), "deck.pdf", ImportKind.Presentation);
             Invoke("Start");
             screen.Place(head.transform);
 
@@ -188,7 +188,7 @@ namespace StageReadyVR.Import.Tests
         [Test]
         public void ChosenDeckIsPlacedBehindAndAdvancesOneSlideAtATime()
         {
-            SaveResult deck = store.Save(Pdf(3), "deck.pdf");
+            SaveResult deck = store.Save(Pdf(3), "deck.pdf", ImportKind.Presentation);
             Assert.IsTrue(store.SetActivePresentation(deck.File.id));
 
             Invoke("Start");

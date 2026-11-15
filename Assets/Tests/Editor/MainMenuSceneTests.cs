@@ -54,7 +54,7 @@ namespace StageReadyVR.Import.Tests
             Assert.IsNotNull(screen);
 
             var so = new SerializedObject(screen);
-            foreach (string field in new[] { "controller", "menuPanel", "instructionText", "urlText", "pinText", "statusText", "filesText", "presentationText" })
+            foreach (string field in new[] { "controller", "menuPanel", "instructionText", "urlText", "pinText", "statusText", "filesText", "presentationText", "notesText" })
                 Assert.IsNotNull(so.FindProperty(field).objectReferenceValue, field + " is not assigned");
 
             Assert.AreEqual("EnvironmentPanel", ((GameObject)so.FindProperty("menuPanel").objectReferenceValue).name);
@@ -81,6 +81,26 @@ namespace StageReadyVR.Import.Tests
             Transform change = panel.Find("PresentationButton");
             Assert.IsNotNull(change, "PresentationButton is missing, run StageReadyVR > Build Import Screen.");
             AssertCalls(change.GetComponent<Button>(), screen, "CyclePresentation");
+        }
+
+        [Test]
+        public void NotesButtonCyclesTheHeldNotes()
+        {
+            Transform panel = canvas.Find("ImportPanel");
+            var screen = panel.GetComponent<ImportScreen>();
+            Transform change = panel.Find("NotesButton");
+            Assert.IsNotNull(change, "NotesButton is missing, run StageReadyVR > Build Import Screen.");
+            AssertCalls(change.GetComponent<Button>(), screen, "CycleNotes");
+        }
+
+        [Test]
+        public void ScriptStyleButtonSwitchesHeldAndTeleprompter()
+        {
+            Transform panel = canvas.Find("ImportPanel");
+            var screen = panel.GetComponent<ImportScreen>();
+            Transform style = panel.Find("ScriptStyleButton");
+            Assert.IsNotNull(style, "ScriptStyleButton is missing, run StageReadyVR > Build Import Screen.");
+            AssertCalls(style.GetComponent<Button>(), screen, "CycleScriptDisplay");
         }
 
         [Test]
@@ -124,7 +144,7 @@ namespace StageReadyVR.Import.Tests
                 using (var client = new HttpClient())
                 {
                     var request = new HttpRequestMessage(HttpMethod.Post,
-                        "http://127.0.0.1:" + new Uri(controller.Url).Port + "/upload?name=speech.txt")
+                        "http://127.0.0.1:" + new Uri(controller.Url).Port + "/upload?name=speech.txt&kind=script")
                     {
                         Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("Hello everyone."))
                     };
@@ -136,7 +156,7 @@ namespace StageReadyVR.Import.Tests
                 typeof(ImportController).GetMethod("Update", any).Invoke(controller, null);
 
                 Assert.AreEqual("Imported speech.txt.", TextOf(so, "statusText"));
-                StringAssert.StartsWith("speech.txt (txt,", TextOf(so, "filesText"));
+                StringAssert.StartsWith("speech.txt (script, txt,", TextOf(so, "filesText"));
 
                 screen.Close();
                 Assert.IsFalse(controller.IsImporting);
