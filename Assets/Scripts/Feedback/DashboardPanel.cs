@@ -100,7 +100,12 @@ namespace StageReadyVR.Feedback
                     bool demo = (i == 0 && report.hybridPaceSource == "manual_demo") ||
                                 (i == 1 && report.hybridFillerSource == "manual_demo") ||
                                 (i == 3 && report.hybridVolumeSource == "manual_demo");
-                    barLabels[i].text = $"{names[i]}  {Mathf.RoundToInt(vals[i])}" + (demo ? " [DEMO]" : "");
+                    bool missing = (i == 0 && report.hybridPaceSource == "unavailable") ||
+                                   (i == 1 && report.hybridFillerSource == "unavailable") ||
+                                   (i == 2 && report.hybridAudienceFacingSource == "unavailable") ||
+                                   (i == 3 && report.hybridVolumeSource == "unavailable") ||
+                                   (i == 4 && report.hybridComposureSource == "unavailable");
+                    barLabels[i].text = missing ? names[i] + "  N/A" : $"{names[i]}  {Mathf.RoundToInt(vals[i])}" + (demo ? " [DEMO]" : "");
                 }
             }
 
@@ -231,11 +236,18 @@ namespace StageReadyVR.Feedback
             string paceMarker = r.hybridPaceSource == "manual_demo" ? " [DEMO]" : "";
             string fillerMarker = r.hybridFillerSource == "manual_demo" ? " [DEMO]" : "";
             string volumeMarker = r.hybridVolumeSource == "manual_demo" ? " [DEMO]" : "";
-            sb.AppendLine($"Words: {r.totalWords}{paceMarker}   ·   Avg pace: {Mathf.RoundToInt(r.averageWpm)} wpm{paceMarker}");
+            if (r.hybridPaceSource == "unavailable")
+                sb.AppendLine("Speech pace and word count unavailable or incomplete.");
+            else sb.AppendLine($"Words: {r.totalWords}{paceMarker}   ·   Avg pace: {Mathf.RoundToInt(r.averageWpm)} wpm{paceMarker}");
             sb.AppendLine($"Filler words: {r.fillerWordCount}{fillerMarker}   ·   Audience facing: {Mathf.RoundToInt(r.eyeContactRatio * 100)}%");
             if (volumeMarker.Length > 0) sb.AppendLine("Volume metric uses a DEMO value.");
             if (r.distractorsFired > 0)
                 sb.AppendLine($"Distractors handled: {r.distractorsRecoveredQuickly}/{r.distractorsFired}");
+            if (r.hybridPaceSource == "unavailable" || r.hybridFillerSource == "unavailable" || r.hybridAudienceFacingSource == "unavailable")
+                sb.AppendLine("Incomplete live data — overall score is provisional.");
+            string transcript = r.transcript ?? "";
+            if (transcript.Length > 140) transcript = transcript.Substring(0, 140) + "…";
+            sb.AppendLine("Transcript: " + (string.IsNullOrWhiteSpace(transcript) ? "Not available" : EscapeMarkup(transcript)));
             return sb.ToString();
         }
     }

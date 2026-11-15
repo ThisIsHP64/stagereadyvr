@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.WebSockets;
@@ -6,400 +7,293 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
+using StageReadyVR.HybridScoring;
+#if UNITY_ANDROID && !UNITY_EDITOR
+using UnityEngine.Android;
+#endif
 
-/// <summary>
-/// AssemblyAI realtime transcription source.
-///
-/// Audio is captured from Unity's microphone as mono 16-bit PCM at 16 kHz and
-/// streamed to AssemblyAI's v3 WebSocket API. Only final turns are forwarded
-/// to SpeechAnalyzer as full transcript events; interim turns are forwarded as
-/// partial events. Network and microphone failures are logged and leave the
-/// session running instead of throwing into the Unity frame loop.
-///
-/// Development setup:
-///   Create Assets/Resources/assemblyai_key.txt and put only the AssemblyAI
-///   API key in it. The file is ignored by git. Do not ship this key in a
-///   public APK; use a relay service for a real deployment.
-/// </summary>
+// One microphone and one socket per presentation. Never run PicoMicProbe in this scene.
 public class AssemblyTranscriber : SpeechTranscriber
 {
-    private const string Endpoint =
-        "wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro";
-    private const string KeyResourceName = "assemblyai_key";
-    private const int SampleRate = 16000;
-    private const int FramesPerChunk = 800; // 50 ms at 16 kHz
-    private const int MicrophoneBufferSeconds = 2;
-
-    private sealed class TranscriptResult
+    private const int Rate = 16000, Frames = 800, BufferSeconds = 4;
+    private const string Endpoint = "wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro";
+    private sealed class Run
     {
-        public string Text;
-        public bool IsFinal;
+        public readonly ClientWebSocket Socket = new ClientWebSocket();
+        public readonly CancellationTokenSource Cancel = new CancellationTokenSource();
+        public readonly ConcurrentQueue<byte[]> Audio = new ConcurrentQueue<byte[]>();
+        public readonly ConcurrentQueue<Turn> Text = new ConcurrentQueue<Turn>();
+        public volatile bool Connected, Finish, Terminated, Failed;
+        public volatile string Error;
+        public Task Work;
     }
-
-    [Serializable]
-    private sealed class AssemblyMessage
-    {
-        public string type;
-        public string transcript;
-        public bool end_of_turn;
-    }
-
-    private readonly ConcurrentQueue<byte[]> _audioQueue = new ConcurrentQueue<byte[]>();
-    private readonly ConcurrentQueue<TranscriptResult> _transcriptQueue =
-        new ConcurrentQueue<TranscriptResult>();
-    private readonly ConcurrentQueue<string> _statusQueue = new ConcurrentQueue<string>();
-
-    private ClientWebSocket _socket;
-    private CancellationTokenSource _cancellation;
-    private AudioClip _microphoneClip;
-    private float[] _sampleBuffer;
-    private int _lastMicrophoneFrame;
-    private bool _active;
-    private bool _microphoneStarted;
-    private volatile bool _socketOpen;
-    private int _activationVersion;
-
-    public bool IsConnected => _socketOpen;
+    [Serializable] private sealed class Turn { public string type, transcript; public int turn_order; public bool end_of_turn; }
+    [Serializable] private sealed class TokenReply { public string token; }
+    private Run run;
+    private AudioClip clip;
+    private int cursor, nativeChunk, channels;
+    private float lastPump, lastMotion;
+    private Coroutine startup;
+    private bool ending;
+    private int lastFinal = -1;
+    public bool IsConnected => run != null && run.Connected && !run.Failed && !run.Terminated;
+    public bool CompletedSuccessfully { get; private set; }
+    public bool StartupFinished => run != null && startup == null;
+    public bool CaptureReady => StartupFinished && clip != null && IsConnected;
+    public string Status { get; private set; } = "Not started";
+    public event Action<float> OnVolumeDb;
 
     public override void Activate()
     {
-        if (_active) return;
-        _active = true;
-        _activationVersion++;
-
-        string apiKey = LoadApiKey();
-        if (string.IsNullOrEmpty(apiKey))
+        if (run != null || startup != null || ending) return;
+        CompletedSuccessfully = false;
+        lastFinal = -1;
+        Status = "Starting microphone";
+        run = new Run();
+        startup = StartCoroutine(StartCapture(run));
+    }
+    private IEnumerator StartCapture(Run r)
+    {
+        yield return null; // let Activate store the coroutine handle first
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
         {
-            QueueStatus("[AssemblyTranscriber] Missing Assets/Resources/assemblyai_key.txt; " +
-                        "transcription is disabled for this session.");
-            return;
+            Status = "Allow microphone access";
+            Permission.RequestUserPermission(Permission.Microphone);
+            float until = Time.realtimeSinceStartup + 20f;
+            while (run == r && !Permission.HasUserAuthorizedPermission(Permission.Microphone) && Time.realtimeSinceStartup < until)
+                yield return null;
+            if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
+            { Fail(r, "Microphone permission not granted"); startup = null; yield break; }
         }
-
-        int version = _activationVersion;
-        _ = ConnectAsync(apiKey, version);
-    }
-
-    public override void Deactivate()
-    {
-        if (!_active) return;
-        _active = false;
-        _activationVersion++;
-        StopMicrophone();
-
-        ClientWebSocket socket = _socket;
-        CancellationTokenSource cancellation = _cancellation;
-        _socket = null;
-        _cancellation = null;
-        _socketOpen = false;
-        _ = CloseSocketAsync(socket, cancellation);
-
-        RaiseStopped();
-    }
-
-    private void Update()
-    {
-        DrainStatusMessages();
-        DrainTranscriptMessages();
-
-        if (_active && _socketOpen)
+#endif
+        string key = null, token = null;
+        Status = "Connecting to AssemblyAI";
+        if (LiveSessionRelay.TryLoad(out var config, out var configError))
         {
-            if (!_microphoneStarted) StartMicrophone();
-            PumpMicrophone();
+            using (var req = LiveSessionRelay.Request(config, "/aai-token", "GET", null))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { Fail(r, "Speech token request failed (HTTP " + req.responseCode + ")"); startup = null; yield break; }
+                TokenReply reply = null;
+                try { reply = JsonUtility.FromJson<TokenReply>(req.downloadHandler.text); } catch (Exception) { }
+                token = reply == null ? null : reply.token;
+                if (string.IsNullOrWhiteSpace(token)) { Fail(r, "Speech token missing"); startup = null; yield break; }
+            }
         }
-    }
-
-    private async Task ConnectAsync(string apiKey, int version)
-    {
-        var socket = new ClientWebSocket();
-        var cancellation = new CancellationTokenSource();
-
+        else
+        {
+#if UNITY_EDITOR
+            if (LiveSessionRelay.HasConfig) { Fail(r, configError); startup = null; yield break; }
+            key = Environment.GetEnvironmentVariable("ASSEMBLYAI_API_KEY");
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                var asset = Resources.Load<TextAsset>("assemblyai_key");
+                key = asset == null ? null : asset.text.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(key)) { Fail(r, "AssemblyAI key not configured"); startup = null; yield break; }
+#else
+            Fail(r, configError); startup = null; yield break;
+#endif
+        }
+        r.Work = Network(r, key, token);
+        float deadline = Time.realtimeSinceStartup + 15f;
+        while (run == r && !r.Connected && !r.Failed && Time.realtimeSinceStartup < deadline) yield return null;
+        if (run != r) yield break;
+        if (!r.Connected || r.Failed) { Fail(r, r.Error ?? "AssemblyAI connection timed out"); startup = null; yield break; }
+        // The working PICO probe uses the default device and waits for a moving position.
+        // An empty device list on Android is diagnostic, not a reason to refuse the default mic.
         try
         {
-            socket.Options.SetRequestHeader("Authorization", apiKey);
-            await socket.ConnectAsync(new Uri(Endpoint), cancellation.Token);
-
-            if (!_active || version != _activationVersion)
+            Debug.Log("[LiveSpeech] Microphone devices: " + (Microphone.devices?.Length ?? 0));
+            clip = Microphone.Start(null, true, BufferSeconds, Rate);
+        }
+        catch (Exception) { Fail(r, "Microphone.Start failed"); }
+        if (clip == null) { Fail(r, "Microphone returned no audio clip"); startup = null; yield break; }
+        channels = Math.Max(1, clip.channels);
+        nativeChunk = Math.Max(1, Mathf.RoundToInt(clip.frequency / 20f));
+        deadline = Time.realtimeSinceStartup + 5f;
+        while (run == r && !r.Failed && Microphone.GetPosition(null) <= 0 && Time.realtimeSinceStartup < deadline) yield return null;
+        if (run != r) yield break;
+        if (r.Failed || Microphone.GetPosition(null) <= 0) { Fail(r, "Microphone position stayed at zero"); ReleaseMic(); startup = null; yield break; }
+        cursor = 0; lastPump = lastMotion = Time.realtimeSinceStartup;
+        Status = "Listening";
+        Debug.Log("[LiveSpeech] CAPTURE STARTED; rate=" + clip.frequency + " channels=" + channels);
+        startup = null;
+    }
+    private static async Task Network(Run r, string key, string token)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(key)) r.Socket.Options.SetRequestHeader("Authorization", key.Trim());
+            string url = Endpoint + (string.IsNullOrEmpty(token) ? "" : "&token=" + Uri.EscapeDataString(token));
+            await r.Socket.ConnectAsync(new Uri(url), r.Cancel.Token);
+            r.Connected = true;
+            var send = Send(r); var receive = Receive(r);
+            await Task.WhenAny(send, receive);
+            // Normal send completion means Terminate was sent; keep receiving until the server confirms.
+            if (send.IsFaulted) await send;
+            if (receive.IsFaulted) await receive;
+            if (send.IsCompleted && r.Finish && !r.Failed && !r.Terminated) await receive;
+            r.Cancel.Cancel();
+            try { await Task.WhenAll(send, receive); } catch (OperationCanceledException) { }
+            if (!r.Terminated && !r.Failed) Fail(r, "Speech connection closed before final confirmation");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { Fail(r, "AssemblyAI network connection failed"); }
+        finally { r.Connected = false; try { r.Cancel.Cancel(); } catch (ObjectDisposedException) { } r.Socket.Dispose(); r.Cancel.Dispose(); }
+    }
+    private static async Task Send(Run r)
+    {
+        while (!r.Cancel.IsCancellationRequested)
+        {
+            if (r.Audio.TryDequeue(out var packet))
+                await r.Socket.SendAsync(new ArraySegment<byte>(packet), WebSocketMessageType.Binary, true, r.Cancel.Token);
+            else if (r.Finish)
             {
-                await CloseSocketAsync(socket, cancellation);
+                var end = Encoding.UTF8.GetBytes("{\"type\":\"Terminate\"}");
+                await r.Socket.SendAsync(new ArraySegment<byte>(end), WebSocketMessageType.Text, true, r.Cancel.Token);
                 return;
             }
-
-            _socket = socket;
-            _cancellation = cancellation;
-            _socketOpen = true;
-            QueueStatus("[AssemblyTranscriber] AssemblyAI connection established.");
-
-            _ = ReceiveLoopAsync(socket, cancellation.Token);
-            _ = SendLoopAsync(socket, cancellation.Token);
-        }
-        catch (Exception ex)
-        {
-            cancellation.Dispose();
-            socket.Dispose();
-            QueueStatus("[AssemblyTranscriber] Connection failed; continuing without " +
-                        "transcription. " + ex.Message);
+            else await Task.Delay(10, r.Cancel.Token);
         }
     }
-
-    private async Task SendLoopAsync(ClientWebSocket socket, CancellationToken token)
+    private static async Task Receive(Run r)
     {
-        try
+        var buffer = new byte[16384];
+        while (!r.Cancel.IsCancellationRequested)
         {
-            while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
+            using (var message = new MemoryStream())
             {
-                if (_audioQueue.TryDequeue(out byte[] audio))
+                WebSocketReceiveResult part;
+                do
                 {
-                    await socket.SendAsync(new ArraySegment<byte>(audio),
-                        WebSocketMessageType.Binary, true, token);
-                }
-                else
-                {
-                    await Task.Delay(10, token);
-                }
+                    part = await r.Socket.ReceiveAsync(new ArraySegment<byte>(buffer), r.Cancel.Token);
+                    if (part.MessageType == WebSocketMessageType.Close) return;
+                    message.Write(buffer, 0, part.Count);
+                    if (message.Length > 1024 * 1024) throw new InvalidDataException();
+                } while (!part.EndOfMessage);
+                Turn t = JsonUtility.FromJson<Turn>(Encoding.UTF8.GetString(message.ToArray()));
+                if (t == null) continue;
+                if (t.type == "Turn") r.Text.Enqueue(t);
+                if (t.type == "Termination") { r.Terminated = true; return; }
+                if (t.type == "Error") { Fail(r, "AssemblyAI returned a speech error"); return; }
             }
         }
-        catch (OperationCanceledException)
+    }
+    private static void Fail(Run r, string reason) { r.Error = reason; r.Failed = true; try { r.Cancel.Cancel(); } catch (ObjectDisposedException) { } }
+    private void Update()
+    {
+        if (run == null) return;
+        Drain(run);
+        if (run.Failed)
         {
-            // Normal during Deactivate.
+            if (Status != run.Error) Debug.LogWarning("[LiveSpeech] " + run.Error);
+            Status = run.Error;
+            ReleaseMic();
+            return;
         }
-        catch (Exception ex)
+        if (startup == null && !ending && clip != null) Pump(run, false);
+    }
+    private void Drain(Run r)
+    {
+        while (r.Text.TryDequeue(out var t))
         {
-            QueueStatus("[AssemblyTranscriber] Audio stream failed; continuing without " +
-                        "transcription. " + ex.Message);
-            _socketOpen = false;
+            if (t.turn_order <= lastFinal) continue;
+            if (t.end_of_turn)
+            {
+                lastFinal = t.turn_order;
+                if (!string.IsNullOrWhiteSpace(t.transcript)) RaiseFull(t.transcript);
+                else RaisePartial("");
+            }
+            else RaisePartial(t.transcript ?? "");
         }
     }
-
-    private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken token)
+    private void Pump(Run r, bool flush)
     {
-        byte[] buffer = new byte[64 * 1024];
-
+        if (clip == null || r.Failed) return;
         try
         {
-            while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
+            float now = Time.realtimeSinceStartup;
+            int pos = Microphone.GetPosition(null);
+            if (pos < 0 || !Microphone.IsRecording(null)) { Fail(r, "Microphone stopped unexpectedly"); return; }
+            if (now - lastPump >= BufferSeconds - 0.25f) { Fail(r, "Audio buffer overrun"); return; }
+            lastPump = now;
+            int available = (pos - cursor + clip.samples) % clip.samples;
+            if (available > 0) lastMotion = now;
+            if (!flush && now - lastMotion > 3f) { Fail(r, "Microphone stopped delivering audio"); return; }
+            while (available >= nativeChunk || (flush && available > 0))
             {
-                using (var message = new MemoryStream())
+                int n = Math.Min(nativeChunk, available);
+                var raw = new float[n * channels];
+                if (!clip.GetData(raw, cursor)) { Fail(r, "Microphone audio could not be read"); return; }
+                var pcm = new byte[Frames * 2];
+                double power = 0;
+                for (int f = 0; f < n; f++) { float sample = Mono(raw, f, channels); power += sample * sample; }
+                float db = Mathf.Max(-80f, 10f * Mathf.Log10(Mathf.Max(1e-8f, (float)(power / n))));
+                OnVolumeDb?.Invoke(db);
+                int output = Math.Min(Frames, Mathf.RoundToInt(n * (float)Frames / nativeChunk));
+                for (int i = 0; i < output; i++)
                 {
-                    WebSocketReceiveResult received;
-                    do
-                    {
-                        received = await socket.ReceiveAsync(
-                            new ArraySegment<byte>(buffer), token);
-
-                        if (received.MessageType == WebSocketMessageType.Close)
-                        {
-                            _socketOpen = false;
-                            QueueStatus("[AssemblyTranscriber] AssemblyAI closed the connection.");
-                            return;
-                        }
-
-                        message.Write(buffer, 0, received.Count);
-                    }
-                    while (!received.EndOfMessage);
-
-                    HandleServerMessage(Encoding.UTF8.GetString(message.ToArray()));
+                    float p = i * (float)nativeChunk / Frames;
+                    int a = Math.Min(n - 1, (int)p), b = Math.Min(n - 1, a + 1);
+                    float v = Mathf.Lerp(Mono(raw, a, channels), Mono(raw, b, channels), p - a);
+                    int s = Mathf.RoundToInt(Mathf.Clamp(v, -1f, 1f) * 32767f);
+                    pcm[2*i] = (byte)(s & 255); pcm[2*i+1] = (byte)((s >> 8) & 255);
                 }
+                if (r.Audio.Count >= 100) { Fail(r, "Speech network audio queue overflow"); return; }
+                r.Audio.Enqueue(pcm);
+                cursor = (cursor + n) % clip.samples; available -= n;
             }
         }
-        catch (OperationCanceledException)
-        {
-            // Normal during Deactivate.
-        }
-        catch (Exception ex)
-        {
-            _socketOpen = false;
-            QueueStatus("[AssemblyTranscriber] Transcript stream failed; continuing " +
-                        "without transcription. " + ex.Message);
-        }
+        catch (Exception) { Fail(r, "Microphone capture failed"); }
     }
-
-    private void HandleServerMessage(string json)
+    private static float Mono(float[] raw, int frame, int ch)
+    { float sum = 0; for (int i = 0; i < ch; i++) sum += raw[frame*ch+i]; return sum / ch; }
+    private void ReleaseMic()
     {
-        AssemblyMessage message;
-        try
-        {
-            message = JsonUtility.FromJson<AssemblyMessage>(json);
-        }
-        catch (Exception ex)
-        {
-            QueueStatus("[AssemblyTranscriber] Ignored malformed server message: " + ex.Message);
-            return;
-        }
-
-        if (message == null) return;
-
-        if (message.type == "Turn" && !string.IsNullOrWhiteSpace(message.transcript))
-        {
-            _transcriptQueue.Enqueue(new TranscriptResult
-            {
-                Text = message.transcript,
-                IsFinal = message.end_of_turn
-            });
-        }
-        else if (message.type == "Termination")
-        {
-            QueueStatus("[AssemblyTranscriber] AssemblyAI session terminated.");
-        }
+        if (clip == null) return;
+        try { Microphone.End(null); } catch (Exception) { }
+        Destroy(clip); clip = null;
     }
-
-    private void StartMicrophone()
+    public IEnumerator FinishGracefully()
     {
-        if (Microphone.devices == null || Microphone.devices.Length == 0)
+        Run r = run;
+        if (r == null) yield break;
+        ending = true;
+        bool captured = startup == null && clip != null && !r.Failed;
+        if (startup != null) { StopCoroutine(startup); startup = null; }
+        if (captured) Pump(r, true);
+        ReleaseMic();
+        if (captured && !r.Failed && r.Connected)
         {
-            QueueStatus("[AssemblyTranscriber] No microphone was detected; " +
-                        "transcription is disabled for this session.");
-            return;
+            Status = "Finalizing speech";
+            r.Finish = true;
+            float deadline = Time.realtimeSinceStartup + 12f;
+            while (!r.Terminated && !r.Failed && Time.realtimeSinceStartup < deadline) { Drain(r); yield return null; }
         }
-
-        try
-        {
-            _microphoneClip = Microphone.Start(null, true, MicrophoneBufferSeconds, SampleRate);
-            _sampleBuffer = new float[FramesPerChunk * Math.Max(1, _microphoneClip.channels)];
-            _lastMicrophoneFrame = 0;
-            _microphoneStarted = _microphoneClip != null;
-        }
-        catch (Exception ex)
-        {
-            QueueStatus("[AssemblyTranscriber] Microphone could not start; " + ex.Message);
-        }
+        Drain(r);
+        CompletedSuccessfully = captured && r.Terminated && !r.Failed;
+        Status = CompletedSuccessfully ? "Transcript finalized" : (r.Error ?? "Transcript incomplete or timed out");
+        Debug.Log("[LiveSpeech] " + Status);
+        Cleanup(r); RaiseStopped();
     }
-
-    private void PumpMicrophone()
+    private void Cleanup(Run r)
     {
-        if (!_microphoneStarted || _microphoneClip == null) return;
-
-        int currentFrame = Microphone.GetPosition(null);
-        if (currentFrame < 0) return;
-
-        int availableFrames = currentFrame - _lastMicrophoneFrame;
-        if (availableFrames < 0) availableFrames += _microphoneClip.samples;
-
-        while (availableFrames >= FramesPerChunk)
-        {
-            ReadMicrophoneFrames(_lastMicrophoneFrame, FramesPerChunk, _sampleBuffer);
-            _audioQueue.Enqueue(ToPcm16(_sampleBuffer, _microphoneClip.channels));
-            _lastMicrophoneFrame = (_lastMicrophoneFrame + FramesPerChunk) % _microphoneClip.samples;
-            availableFrames -= FramesPerChunk;
-        }
+        if (startup != null) { StopCoroutine(startup); startup = null; }
+        ReleaseMic();
+        if (r.Work == null) { r.Socket.Dispose(); r.Cancel.Dispose(); }
+        else { try { r.Cancel.Cancel(); } catch (ObjectDisposedException) { } }
+        if (run == r) run = null;
+        ending = false;
     }
-
-    private void ReadMicrophoneFrames(int startFrame, int frameCount, float[] destination)
+    public override void Deactivate()
     {
-        int channels = Math.Max(1, _microphoneClip.channels);
-        int sampleStart = startFrame * channels;
-        int sampleCount = frameCount * channels;
-        int totalSamples = _microphoneClip.samples * channels;
-
-        if (sampleStart + sampleCount <= totalSamples)
-        {
-            _microphoneClip.GetData(destination, sampleStart);
-            return;
-        }
-
-        int firstSamples = totalSamples - sampleStart;
-        var first = new float[firstSamples];
-        var second = new float[sampleCount - firstSamples];
-        _microphoneClip.GetData(first, sampleStart);
-        _microphoneClip.GetData(second, 0);
-        Array.Copy(first, 0, destination, 0, first.Length);
-        Array.Copy(second, 0, destination, first.Length, second.Length);
+        if (run == null) return;
+        CompletedSuccessfully = false;
+        string status = run.Error ?? "Stopped"; Cleanup(run); Status = status; RaiseStopped();
     }
-
-    private static byte[] ToPcm16(float[] samples, int channels)
-    {
-        channels = Math.Max(1, channels);
-        int frames = samples.Length / channels;
-        byte[] pcm = new byte[frames * 2];
-
-        for (int frame = 0; frame < frames; frame++)
-        {
-            float value = 0f;
-            for (int channel = 0; channel < channels; channel++)
-                value += samples[frame * channels + channel];
-            value = Mathf.Clamp(value / channels, -1f, 1f);
-            short sample = (short)(value * short.MaxValue);
-            pcm[frame * 2] = (byte)(sample & 0xff);
-            pcm[frame * 2 + 1] = (byte)((sample >> 8) & 0xff);
-        }
-
-        return pcm;
-    }
-
-    private void StopMicrophone()
-    {
-        if (_microphoneStarted)
-        {
-            try { Microphone.End(null); }
-            catch (Exception ex) { QueueStatus("[AssemblyTranscriber] Microphone stop failed: " + ex.Message); }
-        }
-
-        _microphoneStarted = false;
-        _microphoneClip = null;
-        _sampleBuffer = null;
-        while (_audioQueue.TryDequeue(out _)) { }
-    }
-
-    private static async Task CloseSocketAsync(ClientWebSocket socket,
-        CancellationTokenSource cancellation)
-    {
-        if (socket == null) return;
-
-        try
-        {
-            if (socket.State == WebSocketState.Open)
-            {
-                byte[] terminate = Encoding.UTF8.GetBytes("{\"type\":\"Terminate\"}");
-                await socket.SendAsync(new ArraySegment<byte>(terminate),
-                    WebSocketMessageType.Text, true, CancellationToken.None);
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
-                    "Session complete", CancellationToken.None);
-            }
-        }
-        catch (Exception)
-        {
-            // The connection may already be gone; shutdown must stay best-effort.
-        }
-        finally
-        {
-            if (cancellation != null) cancellation.Cancel();
-            socket.Dispose();
-            if (cancellation != null) cancellation.Dispose();
-        }
-    }
-
-    private string LoadApiKey()
-    {
-        TextAsset keyAsset = Resources.Load<TextAsset>(KeyResourceName);
-        return keyAsset == null ? string.Empty : keyAsset.text.Trim();
-    }
-
-    private void QueueTranscript(TranscriptResult result)
-    {
-        _transcriptQueue.Enqueue(result);
-    }
-
-    private void QueueStatus(string message)
-    {
-        _statusQueue.Enqueue(message);
-    }
-
-    private void DrainTranscriptMessages()
-    {
-        while (_transcriptQueue.TryDequeue(out TranscriptResult result))
-        {
-            if (result.IsFinal) RaiseFull(result.Text);
-            else RaisePartial(result.Text);
-        }
-    }
-
-    private void DrainStatusMessages()
-    {
-        while (_statusQueue.TryDequeue(out string message))
-            Debug.LogWarning(message);
-    }
-
-    private void OnDestroy()
-    {
-        Deactivate();
-    }
+    private void OnDestroy() { if (run != null) Cleanup(run); }
 }

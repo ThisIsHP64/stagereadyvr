@@ -52,6 +52,19 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     // ── Internal state ────────────────────────────────────────────────
     private bool isAnalyzing = false;
+    private bool finishingSpeech;
+    private float speechEndedAt = -1f;
+    public bool SpeechDataComplete { get; private set; }
+    public string LiveCaption => (committedTranscript + " " + lastPartial).Trim();
+    public string LiveSpeechStatus => transcriber is AssemblyTranscriber a ? a.Status : "Speech source not available";
+    public bool LiveSpeechStartupFinished => transcriber is AssemblyTranscriber a && a.StartupFinished;
+    public bool LiveSpeechReady => transcriber is AssemblyTranscriber a && a.CaptureReady;
+    public void MarkPresentationStarted()
+    {
+        if (!isAnalyzing) return;
+        ResetState();
+        sessionStartTime = lastWordTime = Time.time;
+    }
     private float sessionStartTime = 0f;
     private float lastWordTime = 0f;
 
@@ -97,6 +110,16 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
     public void StartAnalysis()
     {
         ResetState();
+        finishingSpeech = false;
+        speechEndedAt = -1f;
+        SpeechDataComplete = false;
+        // Preserve a configured AssemblyAI instance; repair missing/legacy scene wiring.
+        if (!(transcriber is AssemblyTranscriber))
+        {
+            transcriber = GetComponent<AssemblyTranscriber>();
+            if (transcriber == null) transcriber = gameObject.AddComponent<AssemblyTranscriber>();
+        }
+        if (feedbackController == null) feedbackController = FindObjectOfType<FeedbackController>();
         isAnalyzing = true;
         sessionStartTime = Time.time;
         lastWordTime = Time.time;
@@ -108,8 +131,27 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         Debug.Log("[SpeechAnalyzer] Analysis started.");
     }
 
+    public System.Collections.IEnumerator StopAnalysisGracefully()
+    {
+        if (!isAnalyzing || finishingSpeech) yield break;
+        finishingSpeech = true;
+        speechEndedAt = Time.time;
+        if (transcriber is AssemblyTranscriber assembly)
+        {
+            yield return assembly.FinishGracefully();
+            SpeechDataComplete = assembly.CompletedSuccessfully && string.IsNullOrWhiteSpace(lastPartial);
+        }
+        StopAnalysis();
+    }
+
+    private void CaptureSharedVolume(float db)
+    {
+        if (isAnalyzing) volumeSamplesDb.Add(db);
+    }
+
     public void StopAnalysis()
     {
+        if (speechEndedAt < 0f) speechEndedAt = Time.time;
         isAnalyzing = false;
 
         UnsubscribeTranscriber();
@@ -138,6 +180,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         transcriber.OnPartialTranscription += OnPartial;
         transcriber.OnFullTranscription += OnFull;
         transcriber.OnStoppedListening += OnStoppedListening;
+        if (transcriber is AssemblyTranscriber assembly) assembly.OnVolumeDb += CaptureSharedVolume;
     }
 
     private void UnsubscribeTranscriber()
@@ -146,6 +189,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         transcriber.OnPartialTranscription -= OnPartial;
         transcriber.OnFullTranscription -= OnFull;
         transcriber.OnStoppedListening -= OnStoppedListening;
+        if (transcriber is AssemblyTranscriber assembly) assembly.OnVolumeDb -= CaptureSharedVolume;
     }
 
     private void ActivateTranscriber()
@@ -166,7 +210,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         // stamps the reference time even if a reactivation is already queued.
         _lastStoppedTime = Time.realtimeSinceStartup;
 
-        if (!isAnalyzing || _reactivateQueued) return;
+        if (!isAnalyzing || finishingSpeech || _reactivateQueued) return;
         _reactivateQueued = true;
         StartCoroutine(ReactivateAfterDelay());
     }
@@ -176,7 +220,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         // Small gap lets the service fully release before we re-activate.
         yield return new WaitForSeconds(0.15f);
         _reactivateQueued = false;
-        if (isAnalyzing)
+        if (isAnalyzing && !finishingSpeech)
             ActivateTranscriber();
     }
 
@@ -239,7 +283,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
         string[] words = TokenizeLower(chunk);
         if (words.Length == 0) return;
 
-        float now = Time.time;
+        float now = speechEndedAt >= 0f ? speechEndedAt : Time.time;
 
         // Pause detection: gap since last spoken word.
         float gap = now - lastWordTime;
@@ -341,7 +385,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     private float ComputeAverageWpm()
     {
-        float elapsed = (isAnalyzing ? Time.time : lastWordTime) - sessionStartTime;
+        float elapsed = (speechEndedAt >= 0f ? speechEndedAt : Time.time) - sessionStartTime;
         float minutes = Mathf.Max(elapsed / 60f, 0.01f);
         return totalWords / minutes;
     }
@@ -418,7 +462,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
 
     void Update()
     {
-        if (!isAnalyzing) return;
+        if (!isAnalyzing || finishingSpeech) return;
 
         volumeTimer += Time.deltaTime;
         if (volumeTimer >= volumeSampleRate)
@@ -432,7 +476,7 @@ public class SpeechAnalyzer : MonoBehaviour, ISpeechMetricsSource
     void OnDestroy()
     {
         UnsubscribeTranscriber();
-        StopMicrophone();
+        if (transcriber != null) transcriber.Deactivate();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
