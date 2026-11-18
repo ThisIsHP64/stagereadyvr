@@ -22,6 +22,7 @@ namespace StageReadyVR.Feedback
         [Header("Sub-score bars (order: pace, filler, eye, volume, composure)")]
         [SerializeField] private Image[] barFills = new Image[5];
         [SerializeField] private TMP_Text[] barLabels = new TMP_Text[5];
+        [SerializeField] private TMP_Text[] barScoreLabels = new TMP_Text[5];
 
         [Header("Summary + actions")]
         [SerializeField] private TMP_Text summaryText;
@@ -49,7 +50,7 @@ namespace StageReadyVR.Feedback
         /// </summary>
         public void EditorWire(
             Image overallFill, TMP_Text overallLabel, TMP_Text gradeLabel,
-            Image[] barFills, TMP_Text[] barLabels,
+            Image[] barFills, TMP_Text[] barLabels, TMP_Text[] barScoreLabels,
             TMP_Text summaryText, Button retryButton, Button nextButton,
             TMP_Text coachingStatus, TMP_Text strengthsText, TMP_Text recommendationsText,
             DashboardBackdrop backdrop)
@@ -59,6 +60,7 @@ namespace StageReadyVR.Feedback
             this.gradeLabel = gradeLabel;
             this.barFills = barFills;
             this.barLabels = barLabels;
+            this.barScoreLabels = barScoreLabels;
             this.summaryText = summaryText;
             this.retryButton = retryButton;
             this.nextButton = nextButton;
@@ -95,18 +97,19 @@ namespace StageReadyVR.Feedback
 
             for (int i = 0; i < barFills.Length && i < vals.Length; i++)
             {
+                bool demo = (i == 0 && report.hybridPaceSource == "manual_demo") ||
+                            (i == 1 && report.hybridFillerSource == "manual_demo") ||
+                            (i == 3 && report.hybridVolumeSource == "manual_demo");
+                bool missing = (i == 0 && report.hybridPaceSource == "unavailable") ||
+                               (i == 1 && report.hybridFillerSource == "unavailable") ||
+                               (i == 2 && report.hybridAudienceFacingSource == "unavailable") ||
+                               (i == 3 && report.hybridVolumeSource == "unavailable") ||
+                               (i == 4 && report.hybridComposureSource == "unavailable");
+
                 if (barLabels != null && i < barLabels.Length && barLabels[i] != null)
-                {
-                    bool demo = (i == 0 && report.hybridPaceSource == "manual_demo") ||
-                                (i == 1 && report.hybridFillerSource == "manual_demo") ||
-                                (i == 3 && report.hybridVolumeSource == "manual_demo");
-                    bool missing = (i == 0 && report.hybridPaceSource == "unavailable") ||
-                                   (i == 1 && report.hybridFillerSource == "unavailable") ||
-                                   (i == 2 && report.hybridAudienceFacingSource == "unavailable") ||
-                                   (i == 3 && report.hybridVolumeSource == "unavailable") ||
-                                   (i == 4 && report.hybridComposureSource == "unavailable");
-                    barLabels[i].text = missing ? names[i] + "  N/A" : $"{names[i]}  {Mathf.RoundToInt(vals[i])}" + (demo ? " [DEMO]" : "");
-                }
+                    barLabels[i].text = names[i] + (demo ? " [DEMO]" : "");
+                if (barScoreLabels != null && i < barScoreLabels.Length && barScoreLabels[i] != null)
+                    barScoreLabels[i].text = missing ? "N/A" : Mathf.RoundToInt(vals[i]).ToString();
             }
 
             if (summaryText != null) summaryText.text = BuildSummary(report);

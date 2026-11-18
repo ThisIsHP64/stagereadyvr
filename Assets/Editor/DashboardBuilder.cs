@@ -24,10 +24,15 @@ public static class DashboardBuilder
     static readonly Color Track = Hex(0x3A, 0x4E, 0x66, 1f);      // muted slate (empty bar)
     static readonly Color Accent = Hex(0x26, 0x92, 0x44, 1f);      // green
     static readonly Color AccentDim = Hex(0x26, 0x92, 0x44, 0.25f);   // green faded (ring bg)
+    static readonly Color CornerBlue = Hex(0x61, 0x9B, 0xFF, 1f);   // bright blue accent for decorative corners
     static readonly Color Amber = Hex(0xFF, 0xCC, 0x33, 1f);      // amber (mid tier)
     static readonly Color TextHi = Hex(0xFF, 0xF8, 0xF0, 1f);      // warm off-white (headings)
     static readonly Color TextLo = Hex(0xA1, 0xB5, 0xCE, 1f);      // powder blue (secondary text)
+    static readonly Color ButtonBorder = Hex(0xD6, 0xDE, 0xE8, 1f); // light gray action outline
     static readonly Color Dim = Hex(0x1A, 0x24, 0x31, 1f);      // deep slate (backdrop)
+
+    const string RoundedPanelSpritePath = "Assets/prefabs_custom_screeens/FeedbackDashboardRounded.png";
+    const string CornerArcSpritePath = "Assets/prefabs_custom_screeens/FeedbackDashboardCornerArc.png";
 
     static Color Hex(int r, int g, int b, float a)
         => new Color(r / 255f, g / 255f, b / 255f, a);
@@ -68,8 +73,21 @@ public static class DashboardBuilder
         backdropGO.SetActive(false);
 
         // ── Dashboard background + content ──
-        var bgRT = NewImage(crt, "Background", Bg, out _);
+        var bgRT = NewImage(crt, "Background", Bg, out var bgImage);
         Stretch(bgRT);
+        var roundedPanel = AssetDatabase.LoadAssetAtPath<Sprite>(RoundedPanelSpritePath);
+        if (roundedPanel == null)
+            throw new System.InvalidOperationException("Missing rounded dashboard sprite at " + RoundedPanelSpritePath);
+        bgImage.sprite = roundedPanel;
+        bgImage.type = Image.Type.Sliced;
+
+        var cornerArc = AssetDatabase.LoadAssetAtPath<Sprite>(CornerArcSpritePath);
+        if (cornerArc == null)
+            throw new System.InvalidOperationException("Missing dashboard corner arc sprite at " + CornerArcSpritePath);
+        AddCornerDecoration(bgRT, new Vector2(48f, -48f), new Vector2(0, 1), new Vector3(1, 1, 1), cornerArc, CornerBlue);
+        AddCornerDecoration(bgRT, new Vector2(-48f, -48f), new Vector2(1, 1), new Vector3(-1, 1, 1), cornerArc, CornerBlue);
+        AddCornerDecoration(bgRT, new Vector2(48f, 48f), new Vector2(0, 0), new Vector3(1, -1, 1), cornerArc, CornerBlue);
+        AddCornerDecoration(bgRT, new Vector2(-48f, 48f), new Vector2(1, 0), new Vector3(-1, -1, 1), cornerArc, CornerBlue);
 
         var content = NewRect(bgRT, "Content");
         Stretch(content);
@@ -127,6 +145,7 @@ public static class DashboardBuilder
         string[] barNames = { "Pace", "Filler control", "Eye contact", "Volume", "Composure" };
         var barFills = new Image[5];
         var barLabels = new TMP_Text[5];
+        var barScoreLabels = new TMP_Text[5];
 
         float barTop = 260f, barRowH = 56f;
         for (int i = 0; i < 5; i++)
@@ -135,18 +154,29 @@ public static class DashboardBuilder
             Col(rowRT, leftX, colW, barTop + i * barRowH, barRowH - 14);
 
             var labelRT = NewText(rowRT, "Label", barNames[i], 21, TextLo, FontStyles.Normal, out var label);
-            labelRT.anchorMin = new Vector2(0, 0);
+            labelRT.anchorMin = new Vector2(0, 1);
             labelRT.anchorMax = new Vector2(1, 1);
-            labelRT.offsetMin = Vector2.zero;
-            labelRT.offsetMax = new Vector2(0, 21);
+            labelRT.pivot = new Vector2(0, 1);
+            labelRT.sizeDelta = new Vector2(-80, 24);
+            labelRT.anchoredPosition = Vector2.zero;
             label.alignment = TextAlignmentOptions.Left;
             barLabels[i] = label;
+
+            var scoreRT = NewText(rowRT, "Score", "0", 20, TextHi, FontStyles.Bold, out var scoreLabel);
+            scoreRT.anchorMin = new Vector2(1, 0);
+            scoreRT.anchorMax = new Vector2(1, 0);
+            scoreRT.pivot = new Vector2(1, 0.5f);
+            scoreRT.sizeDelta = new Vector2(64, 24);
+            scoreRT.anchoredPosition = new Vector2(-4, 6);
+            scoreLabel.alignment = TextAlignmentOptions.Right;
+            scoreLabel.enableWordWrapping = false;
+            barScoreLabels[i] = scoreLabel;
 
             var trackRT = NewImage(rowRT, "Track", Track, out var trackImg);
             trackRT.anchorMin = new Vector2(0, 0);
             trackRT.anchorMax = new Vector2(1, 0);
-            trackRT.pivot = new Vector2(0.5f, 0);
-            trackRT.sizeDelta = new Vector2(0, 12);
+            trackRT.pivot = new Vector2(0, 0);
+            trackRT.sizeDelta = new Vector2(-80, 12);
             trackRT.anchoredPosition = Vector2.zero;
             Rounded(trackImg);
 
@@ -245,7 +275,7 @@ public static class DashboardBuilder
         var panel = canvasGO.AddComponent<DashboardPanel>();
         panel.EditorWire(
             overallFill, overallLabel, gradeLabel,
-            barFills, barLabels,
+            barFills, barLabels, barScoreLabels,
             summaryText, retryButton, nextButton,
             coachingStatus, strengthsText, recommendationsText,
             backdrop);
@@ -275,6 +305,19 @@ public static class DashboardBuilder
         le.flexibleHeight = 0;
         var tmp = rt.GetComponent<TMP_Text>();
         if (tmp != null) tmp.enableAutoSizing = false;
+    }
+
+    static void AddCornerDecoration(RectTransform parent, Vector2 anchoredPos, Vector2 anchor, Vector3 scale, Sprite sprite, Color color)
+    {
+        var rt = NewImage(parent, "CornerArc", color, out var img);
+        img.raycastTarget = false;
+        img.sprite = sprite;
+        rt.anchorMin = anchor;
+        rt.anchorMax = anchor;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(144f, 144f);
+        rt.anchoredPosition = anchoredPos;
+        rt.localScale = scale;
     }
 
     static RectTransform NewRect(RectTransform parent, string name)
@@ -312,6 +355,10 @@ public static class DashboardBuilder
         var rt = NewImage(parent, name, Card, out var img);
         img.gameObject.AddComponent<Button>();
         Rounded(img);
+        var outline = img.gameObject.AddComponent<Outline>();
+        outline.effectColor = ButtonBorder;
+        outline.effectDistance = new Vector2(5f, 5f);
+        outline.useGraphicAlpha = false;
         rt.anchorMin = new Vector2(side, 0);
         rt.anchorMax = new Vector2(side, 0);
         rt.pivot = new Vector2(side, 0);
