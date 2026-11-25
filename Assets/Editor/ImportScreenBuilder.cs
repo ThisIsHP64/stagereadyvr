@@ -82,8 +82,9 @@ public static class ImportScreenBuilder
         // side by side so the panel keeps its original height
         Button change = NewButton(rect, "PresentationButton", "Change Slides", font, -250, 172, -273, 20);
         Button changeNotes = NewButton(rect, "NotesButton", "Change Notes", font, -250, 172, -91, 20);
-        Button scriptStyle = NewButton(rect, "ScriptStyleButton", "Script Style", font, -250, 172, 91, 20);
+        Button scriptStyle = NewButton(rect, "ScriptStyleButton", "Teleprompter On/Off", font, -250, 172, 91, 20);
         Button back = NewButton(rect, "BackButton", "Back", font, -250, 172, 273, 20);
+        Button pace = NewButton(rect, "TeleprompterPaceButton", "Teleprompter Pace", font, -185, 220, 0, 18);
 
         // behaviour
         var controller = panel.AddComponent<ImportController>();
@@ -105,6 +106,7 @@ public static class ImportScreenBuilder
         UnityEventTools.AddPersistentListener(changeNotes.onClick, screen.CycleNotes);
         UnityEventTools.AddPersistentListener(scriptStyle.onClick, screen.CycleScriptDisplay);
         UnityEventTools.AddPersistentListener(back.onClick, screen.Close);
+        UnityEventTools.AddPersistentListener(pace.onClick, screen.CycleTeleprompterPace);
 
         // entry point on the main menu, below the three environment buttons
         Button open = NewButton((RectTransform)menu, OpenButtonName, "Import Files", font, -250, 400);

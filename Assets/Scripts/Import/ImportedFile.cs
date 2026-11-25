@@ -17,6 +17,14 @@ namespace StageReadyVR.Import
         Teleprompter    // scrolling text at eye level toward the audience
     }
 
+    /// <summary>Named teleprompter speeds exposed by the setup menu.</summary>
+    public enum TeleprompterPace
+    {
+        Slow,
+        Medium,
+        Fast
+    }
+
     /// <summary>
     /// One imported file as recorded in the store index. Field names are public
     /// and lowercase because JsonUtility serializes them directly.

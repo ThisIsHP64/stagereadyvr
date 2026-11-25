@@ -201,7 +201,7 @@ namespace StageReadyVR.Notes
             if (active == null) return;
 
             // a text script set to the teleprompter is shown there instead
-            if (Teleprompter.ShowsOnTeleprompter(active, store.GetScriptDisplay())) return;
+            if (store.GetTeleprompterEnabled() && Teleprompter.ShowsOnTeleprompter(active, store.GetScriptDisplay())) return;
 
             kind = active.kind;
             HasNotes = true;

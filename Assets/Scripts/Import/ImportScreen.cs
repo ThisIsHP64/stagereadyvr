@@ -106,9 +106,42 @@ namespace StageReadyVR.Import
 
             ImportStore store = controller.Store;
             ScriptDisplay next = store.GetScriptDisplay() == ScriptDisplay.Held ? ScriptDisplay.Teleprompter : ScriptDisplay.Held;
-            if (!store.SetScriptDisplay(next))
+            if (!store.SetScriptDisplay(next) || !store.SetTeleprompterEnabled(next == ScriptDisplay.Teleprompter))
                 SetText(statusText, "The script style could not be saved. Try again.");
             Refresh();
+        }
+
+        /// <summary>Explicit setup hook for a Teleprompter On/Off toggle.</summary>
+        public void SetTeleprompterEnabled(bool enabled)
+        {
+            if (controller == null) return;
+            ImportStore store = controller.Store;
+            bool saved = store.SetTeleprompterEnabled(enabled);
+            if (enabled) saved = saved && store.SetScriptDisplay(ScriptDisplay.Teleprompter);
+            if (!saved) SetText(statusText, "The teleprompter setting could not be saved. Try again.");
+            Refresh();
+        }
+
+        /// <summary>Explicit setup hook for a Slow/Medium/Fast pace selector.</summary>
+        public void SetTeleprompterPace(TeleprompterPace pace)
+        {
+            if (controller == null) return;
+            // A setup choice should take effect on the next session instead of
+            // being hidden by an older runtime speed saved in PlayerPrefs.
+            PlayerPrefs.DeleteKey("TeleprompterWpm");
+            PlayerPrefs.Save();
+            if (!controller.Store.SetTeleprompterPace(pace))
+                SetText(statusText, "The teleprompter pace could not be saved. Try again.");
+            Refresh();
+        }
+
+        /// <summary>Cycles Slow, Medium, and Fast for a simple menu button.</summary>
+        public void CycleTeleprompterPace()
+        {
+            if (controller == null) return;
+            TeleprompterPace current = controller.Store.GetTeleprompterPace();
+            TeleprompterPace next = (TeleprompterPace)(((int)current + 1) % 3);
+            SetTeleprompterPace(next);
         }
 
         public static string FormatNotes(ImportedFile active, ScriptDisplay display = ScriptDisplay.Held)
@@ -199,8 +232,15 @@ namespace StageReadyVR.Import
             SetText(filesText, controller != null ? FormatList(controller.Store.List(), MaxListed) : string.Empty);
             SetText(presentationText, controller != null ? FormatPresentation(controller.Store.GetActivePresentation()) : string.Empty);
             SetText(notesText, controller != null
-                ? FormatNotes(controller.Store.GetActiveNotes(), controller.Store.GetScriptDisplay())
+                ? FormatNotesWithSettings(controller.Store)
                 : string.Empty);
+        }
+
+        static string FormatNotesWithSettings(ImportStore store)
+        {
+            string notes = FormatNotes(store.GetActiveNotes(), store.GetScriptDisplay());
+            return notes + " | Teleprompter: " + (store.GetTeleprompterEnabled() ? "On" : "Off")
+                + " | Pace: " + store.GetTeleprompterPace();
         }
 
         /// <summary>Lists imports as one line each, newest first, with a note when more exist.</summary>

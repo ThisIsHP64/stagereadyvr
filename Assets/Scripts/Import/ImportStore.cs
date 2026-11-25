@@ -36,6 +36,10 @@ namespace StageReadyVR.Import
 
         // a ScriptDisplay value; zero keeps older indexes on held pages
         public int scriptDisplay;
+
+        // -1 means this setting was not written by an older index.
+        public int teleprompterEnabled = -1;
+        public int teleprompterPace = -1;
     }
 
     /// <summary>
@@ -303,6 +307,50 @@ namespace StageReadyVR.Import
             }
         }
 
+        /// <summary>Whether a selected text script should appear as a teleprompter.</summary>
+        public bool GetTeleprompterEnabled()
+        {
+            int raw;
+            lock (gate) raw = LoadIndex().teleprompterEnabled;
+
+            // Preserve the behavior of older imports: choosing Teleprompter means on.
+            return raw < 0 ? GetScriptDisplay() == ScriptDisplay.Teleprompter : raw != 0;
+        }
+
+        /// <summary>Saves the teleprompter on/off setup choice.</summary>
+        public bool SetTeleprompterEnabled(bool enabled)
+        {
+            lock (gate)
+            {
+                ImportIndex index = LoadIndex();
+                index.teleprompterEnabled = enabled ? 1 : 0;
+                return SaveIndex(index, "saving teleprompter setting");
+            }
+        }
+
+        /// <summary>Reads the named setup pace, defaulting to Medium for older imports.</summary>
+        public TeleprompterPace GetTeleprompterPace()
+        {
+            int raw;
+            lock (gate) raw = LoadIndex().teleprompterPace;
+            return Enum.IsDefined(typeof(TeleprompterPace), raw)
+                ? (TeleprompterPace)raw
+                : TeleprompterPace.Medium;
+        }
+
+        /// <summary>Saves the named teleprompter pace.</summary>
+        public bool SetTeleprompterPace(TeleprompterPace pace)
+        {
+            if (!Enum.IsDefined(typeof(TeleprompterPace), pace)) return false;
+
+            lock (gate)
+            {
+                ImportIndex index = LoadIndex();
+                index.teleprompterPace = (int)pace;
+                return SaveIndex(index, "saving teleprompter pace");
+            }
+        }
+
         public bool Delete(string id)
         {
             lock (gate)
@@ -359,6 +407,8 @@ namespace StageReadyVR.Import
                     index.activePresentationId = active;
 
                 index.scriptDisplay = loaded.scriptDisplay;
+                index.teleprompterEnabled = loaded.teleprompterEnabled;
+                index.teleprompterPace = loaded.teleprompterPace;
 
                 string notes = loaded.activeNotesId;
                 if (!string.IsNullOrEmpty(notes) && index.files.Exists(f => f.id == notes))
@@ -369,6 +419,21 @@ namespace StageReadyVR.Import
                 Debug.LogWarning("[ImportStore] index unreadable, starting empty: " + e.Message);
             }
             return index;
+        }
+
+        bool SaveIndex(ImportIndex index, string operation)
+        {
+            try
+            {
+                Directory.CreateDirectory(root);
+                WriteReplacing(IndexPath, System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(index)));
+                return true;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                Debug.LogWarning("[ImportStore] " + operation + " failed: " + e.Message);
+                return false;
+            }
         }
 
         // write to a temp file first so a crash never leaves a half written target

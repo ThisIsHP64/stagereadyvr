@@ -170,7 +170,7 @@ namespace StageReadyVR.Notes
 
             ImportStore store = storeOverride ?? ImportStore.CreateDefault();
             ImportedFile active = store.GetActiveNotes();
-            if (!ShowsOnTeleprompter(active, store.GetScriptDisplay())) return;
+            if (!store.GetTeleprompterEnabled() || !ShowsOnTeleprompter(active, store.GetScriptDisplay())) return;
 
             HasScript = true;
             BuildCanvas();
@@ -209,17 +209,25 @@ namespace StageReadyVR.Notes
             script.sizeDelta = new Vector2(0f, height);
 
             // the last line may scroll up to the reading band and no further
-            scroll = new TeleprompterScroll(height - lineHeight, TeleprompterScroll.CountWords(text), LoadSpeed());
+            scroll = new TeleprompterScroll(height - lineHeight, TeleprompterScroll.CountWords(text), LoadSpeed(store));
             ApplyScroll();
             UpdateStatus();
         }
 
-        float LoadSpeed()
+        float LoadSpeed(ImportStore store)
         {
             if (!rememberSpeed) return TeleprompterScroll.DefaultWpm;
             try
             {
-                return PlayerPrefs.GetFloat(SpeedPref, TeleprompterScroll.DefaultWpm);
+                if (PlayerPrefs.HasKey(SpeedPref))
+                    return PlayerPrefs.GetFloat(SpeedPref, TeleprompterScroll.DefaultWpm);
+
+                switch (store.GetTeleprompterPace())
+                {
+                    case TeleprompterPace.Slow: return 90f;
+                    case TeleprompterPace.Fast: return 190f;
+                    default: return 140f;
+                }
             }
             catch (UnityException e)
             {
